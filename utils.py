@@ -8,6 +8,7 @@ from scipy.spatial.distance import jensenshannon
 from scipy.stats import wasserstein_distance
 from gensim.models import KeyedVectors
 from gensim.parsing import preprocessing
+from copy import deepcopy
 
 w2v_model = KeyedVectors.load_word2vec_format("./external/word2vec-slim/GoogleNews-vectors-negative300-SLIM.bin", binary=True)
 
@@ -28,6 +29,17 @@ def tocontinue(ii, idx, label):
             if ii != idx and str(ii) != idx:
                 return True
     return False
+
+def dellistelements(a, b):
+    # return list(set(a) - set(b))
+    t = deepcopy(a)
+    for i in b:
+        t.remove(i)
+    return t
+
+def listintersection(a, b):
+    # return list(set(a) & set(b))
+    return [i for i in a if i in b]
 
 def isdate(entry):
     """

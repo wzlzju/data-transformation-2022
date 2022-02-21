@@ -6,18 +6,22 @@ import numpy as np
 import pandas as pd
 import sklearn
 import matplotlib.pyplot as plt
+import seaborn
 
 from treelib import Tree, Node
+import matplotlib
 from multiprocessing import Process, Pool, Queue
 from _queue import Empty
 
 from spreadsheet import spreadsheet
+from Tengine import transform, printTP
 from V import *
 from T import *
 from Tfunctions import *
 from config import *
 from searchthread import tpaththreadfunction
 from utils import *
+import score
 
 
 
@@ -34,12 +38,25 @@ class searchobj:
 
     def presearch(self):
         for t in tlist.keys():
+            if t not in numtl and t not in cattl:
+                continue
             self.tpathsets[t] = set()
+            rept = getRepT(t)
+            if rept in self.tpathpools.keys():
+                continue
             self.tpathpools[t] = Queue(1)
+            print("start process:", t)
             self.processes[t] = Process(target=tpaththreadfunction, args=(t, self.dataobj.colinfo, self.tpathpools[t],))
             self.processes[t].start()
+        time.sleep(1)
+        print("in presearch:")
         for t in tlist.keys():
-            print("in presearch:",t, self.tpathpools[t].get(True))
+            if t not in numtl and t not in cattl:
+                continue
+            print("\t", t)
+            ctpaths = self.tpathpools[getRepT(t)].get(True)
+            for i, (v, ctpath) in enumerate(ctpaths):
+                printTP(ctpath, TAB="\t\t")
 
 
     def postsearchinitialization(self):
@@ -116,6 +133,8 @@ class searchobj:
         # obtain current new tpaths for all core Ts
         ntpathsets = {}
         for t in tlist.keys():
+            if t not in numtl and t not in cattl:
+                continue
             ctpathset = set([pickle.dumps(ctpath) for cscore, ctpath in self.gettpath(t)])
             ntpathsets[t] = ctpathset - self.tpathsets[t]
             self.tpathsets[t] = self.tpathsets[t] | ntpathsets[t]
@@ -161,7 +180,7 @@ class searchobj:
     def gettpath(self, t):
         if not isinstance(t, str):
             t = t["name"]
-        pool = self.tpathpools[t].get(True)
+        pool = self.tpathpools[getRepT(t)].get(True)
         return pool
         # if t["name"] == "pca":
         #     return []
@@ -182,23 +201,27 @@ class searchobj:
                         <list>: a list of specific rounds
         :return: the newest self.visdata
         """
+        resdatabuffer = {}
+        print("assembling ...")
         root = self.stree.get_node("root")
         vnl = self.stree.children("root")
-        # print("vnl:", vnl)
         self.visdata = []
-        for _, vn in enumerate(vnl):
+        for iter1, vn in enumerate(vnl):
+            if DEBUG:
+                print("vn:", vn)
             vd = {
                 "_chart_type": vn.data["vname"]
             }
             inl = self.stree.children(vn.identifier)
-            # print("\tinl:", inl)
-            for _, in_ in enumerate(inl):
+            for iter2, in_ in enumerate(inl):
+                if DEBUG:
+                    print("\tin:", in_)
                 if vd.get(in_.data["inputname"], None) is None:
                     vd[in_.data["inputname"]] = []
                 paths = self.stree.subtree(in_.identifier).paths_to_leaves()
-                # print("\t\tpaths:", paths)
-                print()
-                for _, path in enumerate(paths):
+                for iter3, path in enumerate(paths):
+                    if DEBUG:
+                        print("\t\tpath:", path)
                     if len(path) == 1:
                         # no appropriate core T
                         # this time the paths list is like [['i-x-x']] and this incomplete path is the only element
@@ -212,8 +235,20 @@ class searchobj:
                         continue
                     coret = self.stree.get_node(path[1]).data["t"]
                     tpath = self.stree.get_node(path[2]).data["tp"]
-                    ndata = transform(self.dataobj.data, coret, tpath)
-                    vd[in_.data["inputname"]].append(ndata)
+                    if DEBUG:
+                        print("\t\t\tcore T:", coret)
+                        printTP(tpath, TAB="\t\t\t")
+                    separation = "<SEPARATION>".encode()
+                    idxstr = pickle.dumps(coret) + separation + pickle.dumps(tpath)
+                    ndata = resdatabuffer.get(idxstr, None)
+                    if ndata is None:
+                        ndata = transform(self.dataobj.data, coret, tpath)
+                        resdatabuffer[idxstr] = ndata
+                    vd[in_.data["inputname"]].append({
+                        "data": ndata,
+                        "coret": coret,
+                        "tpath": tpath
+                    })
             self.visdata.append(vd)
 
         return self.visdata
@@ -225,12 +260,16 @@ class searchobj:
                         None: show all
         :return: None
         """
+        matplotlib.style.use("seaborn")
         for _, cvisd in enumerate(self.visdata):
             if cvisd["_chart_type"].endswith("scatter"):
                 xys = cvisd["xy"]
                 colors = cvisd["color"]
 
-                for ii, xy in enumerate(xys):
+                for ii, xy_obj in enumerate(xys):
+                    xy = xy_obj["data"]
+                    xy_coret = xy_obj["coret"]
+                    xy_tpath = xy_obj["tpath"]
                     if tocontinue(ii, idx, "xy"):
                         continue
 
@@ -241,11 +280,29 @@ class searchobj:
                               type(xy), "in <class searchobj><func showtest><branch scatter>")
                         raise Exception("error unexpected color format")
 
-                    for jj, color in enumerate(colors):
+                    if DEBUG:
+                        print("xy:")
+                        print("core T:", xy_coret)
+                        printTP(xy_tpath, TAB="")
+
+                    for jj, color_obj in enumerate(colors):
+                        color = color_obj["data"]
+                        color_coret = color_obj["coret"]
+                        color_tpath = color_obj["tpath"]
                         if tocontinue(jj, idx, "color"):
                             continue
 
-                        d = np.array(xy)
+                        # optional: only syhthesis V whose two input channels have same final-selected-tpnode
+                        if ONLYVISUALIZESELECTIONMATCHINGCHANNELS and xy_coret["name"] in alignTl and color_coret["name"] in alignTl:
+                            if xy_tpath[-1]["i_type"] != color_tpath[-1]["i_type"] or xy_tpath[-1]["i"] != color_tpath[-1]["i"]:
+                                continue
+
+                        if DEBUG:
+                            print("\tcolor:")
+                            print("\tcore T:", color_coret)
+                            printTP(color_tpath, TAB="\t")
+
+                        d = xy.values
                         d = d.T
 
                         x = d[0]
@@ -260,14 +317,34 @@ class searchobj:
                             print("error: unexpected color format. excepted pandas.Series or pandas.DataFrame, but got",
                                   type(color), "in <class searchobj><func showtest><branch scatter>")
                             raise Exception("error unexpected color format")
-                        if color.dtype == "int64":
+
+                        if cvisd["_chart_type"] == "cat_scatter":
+                            if color.dtype == "float64":
+                                color = color.astype("int64")
+                            if DEBUG:
+                                if len(np.unique(color[color >= 0].values)) > 1:
+                                    print("\tCDM:", score.CDM(xy.values, color.values))
+                                elif len(np.unique(color[color >= 0].values)) == 1:
+                                    pass
+                                else:
+                                    # all data are outliers, may be processed like above (==1)
+                                    pass
+                        elif cvisd["_chart_type"] == "num_scatter":
+                            if color.dtype == "int64":
+                                color = color.astype("float64")
+
+                        # color data -> color  --from palette
+                        if str(color.dtype).startswith("int"):
                             # nominal data -> color
-                            palette = [[141, 211, 199], [255, 255, 179], [190, 186, 218], [251, 128, 114], [128, 177, 211],
-                                       [253, 180, 98], [179, 222, 105], [252, 205, 229], [217, 217, 217], [188, 128, 189]]
-                            palette = [[v / 255 for v in c] for c in palette]
+                            # palette = [[141, 211, 199], [255, 255, 179], [190, 186, 218], [251, 128, 114], [128, 177, 211],
+                            #            [253, 180, 98], [179, 222, 105], [252, 205, 229], [217, 217, 217], [188, 128, 189]]
+                            # palette = [[v / 255 for v in c] for c in palette]
+                            palette = seaborn.color_palette("muted", n_colors=max(color)+1)
+                            # prepare for the outliers
+                            palette.append(OUTLIERCOLOR)
 
                             c = np.array([palette[int(ci) % len(palette)] for ci in np.array(color)])
-                        elif color.dtype == "float64":
+                        elif str(color.dtype).startswith("float"):
                             # numerical data -> color
                             color = color-min(color)
                             color = color/max(color)
@@ -292,7 +369,7 @@ class searchobj:
                             pos = sc.get_offsets()[ind["ind"][0]]
                             annot.xy = pos
                             text = "\n".join(
-                                [(self.dataobj.data[self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[int(cc)] for cc in
+                                [str((self.dataobj.data[self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[int(cc)]) for cc in
                                  list(map(str, ind["ind"]))])
                             annot.set_text(text)
                             # annot.get_bbox_patch().set_facecolor(cmap(norm(c[ind["ind"][0]])))
@@ -331,89 +408,9 @@ class searchobj:
 
 
 
-
-
-def transform(data, coret=None, tpath=None):
-    ndata = data
-    transformation_functions = {
-        "pca": Tpca,
-        "lda": Tlda,
-
-        "test": Ttest
-    }
-
-    # process the basic transformation path
-    if tpath not in [None, "", " ", [], {}]:
-        for t in tpath:
-            # process input
-            if t["i_type"] == "like":
-                idata = ndata.select_dtypes(include=t["i"])
-            elif t["i_type"] == "==":
-                idata = ndata[t["i"]]
-            else:
-                print("error: unexpected basic T input type:", t["i_type"], "in <func transform>")
-                raise Exception("error unexcepted T input type")
-
-            # process T
-            if t["t"] == "astype":
-                odata = idata.astype(*t["args"], **t["kwargs"])
-            elif t["t"] == "sum":
-                odata = idata.apply(lambda x: x.sum(), *t["args"], **t["kwargs"])
-            else:
-                print("error: unexpected basic T:", t["t"], "in <func transform>")
-                raise Exception("error unexcepted T")
-
-            # process index
-            if t["index"] == "default":
-                pass
-            else:
-                odata.index = t["index"]
-
-            # process output
-            if t["o_type"] == "new_table":
-                ndata = odata
-            elif t["o_type"] == "append":
-                ndata = pd.concat([ndata, odata], axis=1)
-            elif t["o_type"] == "replace":
-                ndata.drop(idata, axis=1)
-                ndata = pd.concat([ndata, odata], axis=1)
-            else:
-                print("error: unexpected basic T output type:", t["o_type"], "in <func transform>")
-                raise Exception("error unexcepted T output type")
-
-            # convert ndata into DataFrame
-            # guarantee the ndata is DataFrame before core T
-            if isinstance(ndata, pd.Series):
-                ndata = pd.DataFrame(ndata)
-
-
-    # process the core transformation
-    if coret not in [None, "", " ", [], {}]:
-        ndata = transformation_functions[coret["name"]](data=ndata, para=coret["para"])
-
-    return ndata
-
-
-def Tpca(data, para):
-    ndata = data.select_dtypes(include=["int", "float"])
-    res = ppca(ndata, **para)   # numpy result
-
-    return pd.DataFrame(res)
-
-def Tlda(data, para):
-    ndata = data.select_dtypes(include=["int"])
-    res = plda(ndata, **para)   # numpy result
-
-    return pd.Series(res)
-
-def Ttest(data, para):
-    return data
-
-
-
 if __name__ == "__main__":
-    sheet = spreadsheet("./testdata/ie19.csv")
-    #sheet = spreadsheet("./testdata/NetflixOriginals.csv", encoding="unicode_escape")
+    sheet = spreadsheet("./testdata/LS1/WineQT.csv", encoding="unicode_escape", keep_default_na=False)
+    #sheet = spreadsheet("./testdata/NetflixOriginals.csv", encoding="unicode_escape", keep_default_na=False)
     print(sheet.data)
 
     so = searchobj(dataobj=sheet)
@@ -422,6 +419,7 @@ if __name__ == "__main__":
     stree = so.postsearch()
     visdata = so.assemblevisdata(round=1)
     so.showtest()
+    # so.showtest(idx={"xy": [0, 1, 2], "color": [0, 1]})
     stree = so.postsearch()
     visdata = so.assemblevisdata(round=2)
     so.showtest()
