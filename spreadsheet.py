@@ -14,10 +14,10 @@ from scipy.stats import wasserstein_distance
 
 
 class spreadsheet:
-    def __init__(self, datapath=None, **kwargs):
+    def __init__(self, datapath=None, dataframe=None, **kwargs):
         self.datapath = datapath
         self.data = None
-        if datapath:
+        if datapath is not None:
             self.datapath = datapath
             if self.datapath.endswith(".json"):
                 self.data = pd.read_json(self.datapath, **kwargs)
@@ -26,6 +26,8 @@ class spreadsheet:
             else:
                 print("error: unacceptable data format")
                 raise Exception("error data format")
+        elif dataframe is not None:
+            self.data = dataframe
 
         if len(self.data) > MAXSOURCEDATAROWS:
             self.data = self.data.head(MAXSOURCEDATAROWS)
