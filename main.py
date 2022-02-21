@@ -36,16 +36,16 @@ def cors(environ):
 def csv_in():
     datastr = request.get_data().decode("utf-8")
     data = json.loads(datastr)
-    header = data.get("header", "default")
-    table = data.get("table", "default")
-    print("header", type(header), header)
-    print("table", type(table), table)
+    header = data.get("headers", "default")
+    table = data.get("body", "default")
+    print("headers", type(header), header)
+    print("body", type(table), table)
     global sheet, sobj, stree
     sheet = spreadsheet(dataframe=pd.DataFrame(table, columns=pd.Index(header)), encoding="unicode_escape", keep_default_na=False)
     ret = {
         "columns": {
-            "header": ["attribute", "type", "domain", "max", "min", "iskey", "values"],
-            "content": []
+            "headers": ["attribute", "type", "domain", "max", "min", "iskey", "values"],
+            "body": []
         },
         "dim_clusters": [],
         "sem_clusters": []
@@ -60,7 +60,7 @@ def csv_in():
         content.append(sheet.colinfo["col_type"][colname].get("min", ""))   # min
         content.append("T" if sheet.colinfo["col_type"][colname]["iskey"] else "")  # iskey
         content.append(", ".join([str(i) for i in sheet.data[colname].values]))
-        ret["columns"]["content"].append(content)
+        ret["columns"]["body"].append(content)
 
     ret["dim_clusters"] = sheet.colinfo["dim_match"]["clusters"]
     ret["sem_clusters"] = sheet.colinfo["col_names_simi"]["clusters"]
