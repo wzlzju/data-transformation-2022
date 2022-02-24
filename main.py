@@ -68,14 +68,18 @@ def csv_in():
     return json.dumps(ret)
 
 
-@app.route('/vis/search', methods=['GET'])
+@app.route('/vis/search', methods=['POST'])
 def search_begin():
     global sheet, sobj, stree, visdata
+    print(sheet.data)
     sobj = searchobj(dataobj=sheet)
     sobj.presearch()
     sobj.postsearchinitialization()
     stree = sobj.postsearch()
     visdata = sobj.assemblevisdata(round=1)
+    sobj.assembleandevaluevis()
+    ret = sobj.assembleTtree()
+    return json.dumps(ret)
 
 
 if __name__ == '__main__':

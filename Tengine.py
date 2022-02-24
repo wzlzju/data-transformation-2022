@@ -16,8 +16,11 @@ import score
 
 
 
-def transform(data, coret=None, tpath=None):
+def transform(data, coret=None, tpath=None, tpathtree=None):
     ndata = data
+    if tpathtree is not None:
+        if tpathtree["r"].data is None:
+            tpathtree["r"].data = list(ndata.columns)
     transformation_functions = {
         "pca": Tpca,
         "tsne": Ttsne,
@@ -29,13 +32,18 @@ def transform(data, coret=None, tpath=None):
 
         "null_nom1": Tnull,
         "null_num1": Tnull,
+        "null_num": Tnull,
 
         "test": Ttest
     }
 
     # process the basic transformation path
+    pid = "r"
+    cid = "r"
     if tpath not in [None, "", " ", [], {}]:
         for t in tpath:
+            cid = pid + SEPERATION + str(t)
+
             # process input
             if t["i_type"] == "like":
                 idata = ndata.select_dtypes(include=t["i"])
@@ -91,12 +99,24 @@ def transform(data, coret=None, tpath=None):
             if isinstance(ndata, pd.Series):
                 ndata = pd.DataFrame(ndata)
 
+            if tpathtree is not None:
+                if tpathtree[cid].data is None:
+                    tpathtree[cid].data = list(ndata.columns)
+            pid = cid
+
 
     # process the core transformation
     if coret not in [None, "", " ", [], {}]:
         ndata = transformation_functions[coret["name"]](data=ndata, para=coret["para"])
+        cid = pid + SEPERATION + str(coret)
+        if tpathtree is not None:
+            if tpathtree[cid].data is None:
+                tpathtree[cid].data = list(ndata.columns) if isinstance(ndata, pd.DataFrame) else [0]
 
-    return ndata
+    if tpathtree is not None:
+        return ndata, tpathtree
+    else:
+        return ndata
 
 
 def Tpca(data, para):

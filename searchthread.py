@@ -86,8 +86,7 @@ def tpaththreadfunction(tname, colinfo, q):
 
     if tname == "null_nom1":
         for col in colnames:
-            if coltype[col]["type"] == "nominal":
-                print("null nominal column:", col)
+            if coltype[col]["type"] == "nominal" and not coltype[col]["iskey"]:
                 pool.append((0, tpath([{
                     "t": "nominalize",
                     "i_type": "==",
@@ -97,6 +96,23 @@ def tpaththreadfunction(tname, colinfo, q):
                     "kwargs": {"axis": 1},
                     "index": pd.Index([col, "NOMINAL "+col])
                 }])))
+                updatequeue()
+    elif tname == "null_num1":
+        for col in colnames:
+            if coltype[col]["type"] in ["real", "int"] and not coltype[col]["iskey"]:
+                tpp = tpath()
+                if hasRANK(col):
+                    tpp.append(rank_tp)
+                tpp.append({
+                    "t": "select",
+                    "i_type": "==",
+                    "i": [col],
+                    "o_type": "new_table",
+                    "args": (),
+                    "kwargs": {},
+                    "index": "default"
+                })
+                pool.append((0, tpp))
                 updatequeue()
     elif tinputtype == "num":
         # e.g., pca, lda, kmeans
@@ -364,8 +380,12 @@ def ranking(colinfo):
     return cur_colinfo, TPnode
 
 def hasRANK(l):
-    for s in l:
-        if s.startswith(RANK_prefix):
+    if isinstance(l, list):
+        for s in l:
+            if s.startswith(RANK_prefix):
+                return True
+    elif isinstance(l, str):
+        if l.startswith(RANK_prefix):
             return True
     return False
 

@@ -49,7 +49,7 @@ class spreadsheet:
         self.num_data = self.data.select_dtypes(include=['int', 'float'])
         self.colinfo = {
             "col_names": self.columnnames,
-            "num_col_names": self.num_data.columns,
+            "num_col_names": pd.Index([]),
             "col_type": {},
             "dist_mat": {},
             "col_names_simi": {},
@@ -122,6 +122,11 @@ class spreadsheet:
                             self.colinfo["col_type"][self.key]["iskey"] = False
                         self.colinfo["col_type"][col]["iskey"] = True
                         self.key = col
+                if len(self.colinfo["col_type"][col]["domain"]) <= self.rowsnum * NOMINALSTD or self.colinfo["col_type"][col]["iskey"]:
+                    self.colinfo["col_type"][col]["type"] = "nominal"
+                    self.data[col] = self.data[col].astype("object")
+                else:
+                    self.colinfo["num_col_names"] = self.colinfo["num_col_names"].append(pd.Index([col]))
             elif self.dtypes[idx] == "float64":
                 self.colinfo["col_type"][col] = {
                     "type": "real",
@@ -140,7 +145,7 @@ class spreadsheet:
                         self.colinfo["col_type"][col]["min"] = cd
                     elif cd < self.colinfo["col_type"][col]["min"]:
                         self.colinfo["col_type"][col]["min"] = cd
-                if len(self.colinfo["col_type"][col]["domain"]) == self.rowsnum:
+                if FLOATCANBEKEY and len(self.colinfo["col_type"][col]["domain"]) == self.rowsnum:
                     if self.key and self.colinfo["col_type"][self.key]["type"] in ["str", "int", "real"]:
                         pass
                     else:
@@ -148,17 +153,33 @@ class spreadsheet:
                             self.colinfo["col_type"][self.key]["iskey"] = False
                         self.colinfo["col_type"][col]["iskey"] = True
                         self.key = col
+                if len(self.colinfo["col_type"][col]["domain"]) <= self.rowsnum * NOMINALSTD or self.colinfo["col_type"][col]["iskey"]:
+                    self.colinfo["col_type"][col]["type"] = "nominal"
+                    self.data[col] = self.data[col].astype("object")
+                else:
+                    self.colinfo["num_col_names"] = self.colinfo["num_col_names"].append(pd.Index([col]))
             else:
                 print("error: unsolved dtype:", self.dtypes[idx])
                 raise Exception("error unsolved dtypes")
+        self.num_data = self.data[self.colinfo["num_col_names"]]
+        if self.key is None:
+            self.data = pd.concat([self.data, pd.DataFrame(list(range(len(self.data))), columns=pd.Index(["defaultindex"]))], axis=1)
+            self.key = "defaultindex"
+            self.colinfo["col_type"][self.key] = {
+                "type": "nominal",
+                "domain": set(list(range(len(self.data)))),
+                "max": len(self.data) - 1,
+                "min": 0,
+                "iskey": True
+            }
 
         # compute columns distribution distance matrix
-        self.colinfo["dist_mat"]["wasserstein"] = utils.distmat(self.data.select_dtypes(include=['int', 'float']),
-                                                                self.data.select_dtypes(include=['int', 'float']),
+        self.colinfo["dist_mat"]["wasserstein"] = utils.distmat(self.num_data,
+                                                                self.num_data,
                                                                 metric="wasserstein",
                                                                 type="col")
-        self.colinfo["dist_mat"]["jensenshannon"] = utils.distmat(self.data.select_dtypes(include=['int', 'float']),
-                                                                self.data.select_dtypes(include=['int', 'float']),
+        self.colinfo["dist_mat"]["jensenshannon"] = utils.distmat(self.num_data,
+                                                                self.num_data,
                                                                 metric="jensenshannon",
                                                                 type="col")
 

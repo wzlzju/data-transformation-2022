@@ -10,21 +10,25 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 def ppca(data, n_components=2):
+    data = (data - data.min()) / (data.max() - data.min())
     pca = PCA(n_components=n_components)
     res = pca.fit_transform(data)
     return res
 
 def ptsne(data, n_components=2):
+    data = (data - data.min()) / (data.max() - data.min())
     tsne = TSNE(n_components=n_components)
     res = tsne.fit_transform(data)
     return res
 
 def pmds(data, n_components=2):
+    data = (data - data.min()) / (data.max() - data.min())
     mds = MDS(n_components=n_components, metric=True)
     res = mds.fit_transform(data)
     return res
 
 def pumap(data, n_components=2):
+    data = (data - data.min()) / (data.max() - data.min())
     umap = UMAP(n_components=n_components)
     res = umap.fit_transform(data)
     return res
@@ -55,7 +59,7 @@ def plda(data, n_components=4):
 
 def clean_col_name(s):
     return (s[1:] if s.startswith(" ") else s).replace(':', '_').replace(',', "_").replace(';', '_').replace('.', '_').replace('?', '_').replace('/', '_')\
-        .replace('*', '_').replace('!', '_').replace(' ', '_')
+        .replace('*', '_').replace('!', '_').replace('(', '_').replace(')', '_').replace(' ', '_')
 
 def pdbscan(data, eps=0.25, min_samples=5):
     data = (data - data.min()) / (data.max() - data.min())

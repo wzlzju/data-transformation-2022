@@ -34,6 +34,7 @@ class searchobj:
         self.tpathpools = {}
         self.tpathsets = {}
         self.stree = None
+        self.tpathtree = None
 
 
     def presearch(self):
@@ -106,7 +107,9 @@ class searchobj:
                     ct = tlist[ctname]
 
                     # match the T output and V input
-                    if cinput["dim"] is not None and ct["output"]["dim"] is not None and cinput["dim"] != ct["output"]["dim"]:
+                    # if cinput["dim"] is not None and ct["output"]["dim"] is not None and cinput["dim"] != ct["output"]["dim"]:
+                    #     continue
+                    if cinput["dim"] != ct["output"]["dim"]:
                         continue
 
                     tid = "t-%d-%d-%d" % (vidx, iidx, tidx)
@@ -136,8 +139,31 @@ class searchobj:
             if t not in numtl and t not in cattl:
                 continue
             ctpathset = set([pickle.dumps(ctpath) for cscore, ctpath in self.gettpath(t)])
-            ntpathsets[t] = ctpathset - self.tpathsets[t]
+            if ONLYNEWTPATH:
+                ntpathsets[t] = ctpathset - self.tpathsets[t]
+            else:
+                ntpathsets[t] = ctpathset
             self.tpathsets[t] = self.tpathsets[t] | ntpathsets[t]
+
+        # get basic T path tree for frontend
+        self.tpathtree = Tree()
+        self.tpathtree.create_node(tag="r", identifier="r", data=None)
+        for ctname in numtl+cattl:
+            ntpathset = ntpathsets[ctname]
+            for sctpath in ntpathset:
+                ctpath = pickle.loads(sctpath)
+                pid = "r"
+                cid = "r"
+                for t in ctpath:
+                    cid = pid + SEPERATION + str(t)
+                    if cid not in self.tpathtree.is_branch(pid):
+                        self.tpathtree.create_node(tag=cid, identifier=cid, parent=pid, data=None)
+                    pid = cid
+                cid = pid + SEPERATION + str(tlist[ctname])
+                if cid not in self.tpathtree.is_branch(pid):
+                    self.tpathtree.create_node(tag=cid, identifier=cid, parent=pid, data=None)
+
+
 
         # traverse Vs
         for vidx, cvname in enumerate(list(vlist.keys())):
@@ -160,8 +186,9 @@ class searchobj:
                     ct = tlist[ctname]
 
                     # match the T output and V input
-                    if cinput["dim"] is not None and ct["output"]["dim"] is not None and cinput["dim"] != ct["output"][
-                        "dim"]:
+                    # if cinput["dim"] is not None and ct["output"]["dim"] is not None and cinput["dim"] != ct["output"]["dim"]:
+                    #     continue
+                    if cinput["dim"] != ct["output"]["dim"]:
                         continue
 
                     tid = "t-%d-%d-%d" % (vidx, iidx, tidx)
@@ -242,7 +269,7 @@ class searchobj:
                     idxstr = pickle.dumps(coret) + separation + pickle.dumps(tpath)
                     ndata = resdatabuffer.get(idxstr, None)
                     if ndata is None:
-                        ndata = transform(self.dataobj.data, coret, tpath)
+                        ndata, self.tpathtree = transform(self.dataobj.data, coret, tpath, self.tpathtree)
                         resdatabuffer[idxstr] = ndata
                     vd[in_.data["inputname"]].append({
                         "data": ndata,
@@ -333,6 +360,16 @@ class searchobj:
                             if color.dtype == "int64":
                                 color = color.astype("float64")
 
+                        g = score.dotGraph(xy.values)
+                        g.minSpanTree()
+                        print(g.outlying_value())
+                        print(g.skew_value())
+                        print(g.striated_value())
+                        print(g.stringy_value())
+                        print(g.straight_value())
+                        print(g.spearman_value())
+                        print(g.clumpy_value())
+
                         # color data -> color  --from palette
                         if str(color.dtype).startswith("int"):
                             # nominal data -> color
@@ -393,6 +430,222 @@ class searchobj:
                         plt.show()
 
 
+            elif cvisd["_chart_type"].endswith("bar"):
+                print("waiting for implementing")
+            elif cvisd["_chart_type"].endswith("line"):
+                if cvisd["_chart_type"] == "ord_line":
+                    ys = cvisd["y"]
+
+                    for ii, y_obj in enumerate(ys):
+                        y = y_obj["data"]
+                        y_coret = y_obj["coret"]
+                        y_tpath = y_obj["tpath"]
+                        if tocontinue(ii, idx, "y"):
+                            continue
+                        if isinstance(y, pd.DataFrame):
+                            pass
+                        elif isinstance(y, pd.Series):
+                            y = pd.DataFrame(y)
+                        else:
+                            print("error: unexpected y format. excepted pandas.DataFrame, but got",
+                                  type(y), "in <class searchobj><func showtest><branch line>")
+                            raise Exception("error unexpected color format")
+
+                        if DEBUG:
+                            print("y:")
+                            print("core T:", y_coret)
+                            printTP(y_tpath, TAB="")
+
+                        x = range(len(y))
+                        plt.figure()
+                        for col in y.columns:
+                            plt.plot(x, y[col], label=col)
+                            plt.legend()
+                        plt.show()
+                elif cvisd["_chart_type"] == "rel_line":
+                    xs = cvisd["x"]
+                    ys = cvisd["y"]
+
+                    for ii, x_obj in enumerate(xs):
+                        x = x_obj["data"]
+                        x_coret = x_obj["coret"]
+                        x_tpath = x_obj["tpath"]
+                        if tocontinue(ii, idx, "x"):
+                            continue
+                        if isinstance(x, pd.DataFrame):
+                            pass
+                        elif isinstance(x, pd.Series):
+                            x = pd.DataFrame(x)
+                        else:
+                            print("error: unexpected y format. excepted pandas.DataFrame, but got",
+                                  type(x), "in <class searchobj><func showtest><branch line>")
+                            raise Exception("error unexpected color format")
+
+                        if DEBUG:
+                            print("x:")
+                            print("core T:", x_coret)
+                            printTP(x_tpath, TAB="")
+
+                        sortTOKEN = "<SORTBY>"
+                        x.columns = pd.Index([sortTOKEN + x.columns[0]])
+
+                        for jj, y_obj in enumerate(ys):
+                            y = y_obj["data"]
+                            y_coret = y_obj["coret"]
+                            y_tpath = y_obj["tpath"]
+                            if tocontinue(jj, idx, "y"):
+                                continue
+                            if isinstance(y, pd.DataFrame):
+                                pass
+                            elif isinstance(y, pd.Series):
+                                y = pd.DataFrame(y)
+                            else:
+                                print("error: unexpected y format. excepted pandas.DataFrame, but got",
+                                      type(y), "in <class searchobj><func showtest><branch line>")
+                                raise Exception("error unexpected color format")
+
+                            if DEBUG:
+                                print("y:")
+                                print("core T:", y_coret)
+                                printTP(y_tpath, TAB="")
+
+                            tmpxy = pd.concat([x, y], axis=1)
+                            tmpxy = tmpxy.sort_values(by=tmpxy.columns[0])
+                            tmpx = tmpxy[tmpxy.columns[0]]
+                            tmpy = tmpxy[tmpxy.columns[1:]]
+                            plt.figure()
+                            for col in tmpy.columns:
+                                plt.plot(tmpx, tmpy[col], label=col)
+                                plt.legend()
+                            plt.xlabel(tmpxy.columns[0].replace(sortTOKEN, ""))
+                            plt.show()
+            else:
+                print("error: unexpected vis chart type")
+                raise Exception("error chat type")
+
+    def assembleandevaluevis(self, idx=None):
+        """
+        assemble V using self.visdata, save results in self.vis
+        :param: idx: only show V in idx
+                        None: show all
+        """
+        self.vis = []
+        for _, cvisd in enumerate(self.visdata):
+            if cvisd["_chart_type"].endswith("scatter"):
+                xys = cvisd["xy"]
+                colors = cvisd["color"]
+
+                for ii, xy_obj in enumerate(xys):
+                    xy = xy_obj["data"]
+                    xy_coret = xy_obj["coret"]
+                    xy_tpath = xy_obj["tpath"]
+                    if tocontinue(ii, idx, "xy"):
+                        continue
+
+                    if isinstance(xy, pd.DataFrame):
+                        pass
+                    else:
+                        print("error: unexpected xy format. excepted pandas.DataFrame, but got",
+                              type(xy), "in <class searchobj><func showtest><branch scatter>")
+                        raise Exception("error unexpected xy format")
+
+                    if DEBUG:
+                        print("xy:")
+                        print("core T:", xy_coret)
+                        printTP(xy_tpath, TAB="")
+
+                    for jj, color_obj in enumerate(colors):
+                        color = color_obj["data"]
+                        color_coret = color_obj["coret"]
+                        color_tpath = color_obj["tpath"]
+                        if tocontinue(jj, idx, "color"):
+                            continue
+
+                        # optional: only syhthesis V whose two input channels have same final-selected-tpnode
+                        if ONLYVISUALIZESELECTIONMATCHINGCHANNELS and xy_coret["name"] in alignTl and color_coret["name"] in alignTl:
+                            if xy_tpath[-1]["i_type"] != color_tpath[-1]["i_type"] or xy_tpath[-1]["i"] != color_tpath[-1]["i"]:
+                                continue
+
+                        if DEBUG:
+                            print("\tcolor:")
+                            print("\tcore T:", color_coret)
+                            printTP(color_tpath, TAB="\t")
+
+                        d = xy.values
+                        d = d.T
+
+                        x = d[0]
+                        y = d[1]
+
+                        # process the two color mode
+                        if isinstance(color, pd.DataFrame):
+                            color = color[color.columns[0]]
+                        elif isinstance(color, pd.Series):
+                            pass
+                        else:
+                            print("error: unexpected color format. excepted pandas.Series or pandas.DataFrame, but got",
+                                  type(color), "in <class searchobj><func showtest><branch scatter>")
+                            raise Exception("error unexpected color format")
+
+                        cs = {}
+                        if cvisd["_chart_type"] == "cat_scatter":
+                            if color.dtype == "float64":
+                                color = color.astype("int64")
+                            if DEBUG:
+                                if len(np.unique(color[color >= 0].values)) > 1:
+                                    cs["CDM"] = score.CDM(xy.values, color.values)
+                                elif len(np.unique(color[color >= 0].values)) == 1:
+                                    cs["CDM"] = 0
+                                else:
+                                    # all data are outliers, may be processed like above (==1)
+                                    cs["CDM"] = 0
+                        elif cvisd["_chart_type"] == "num_scatter":
+                            if color.dtype == "int64":
+                                color = color.astype("float64")
+                            color = color - min(color)
+                            color = color / max(color)
+                            tmpcolor = color.apply(lambda x: int(x*4) if x < 1 else 3)
+                            cs["CDM"] = score.CDM(xy.values, tmpcolor.values)
+
+                        # color data -> color  --from palette
+                        if str(color.dtype).startswith("int"):
+                            # nominal data -> color
+                            # palette = [[141, 211, 199], [255, 255, 179], [190, 186, 218], [251, 128, 114], [128, 177, 211],
+                            #            [253, 180, 98], [179, 222, 105], [252, 205, 229], [217, 217, 217], [188, 128, 189]]
+                            # palette = [[v / 255 for v in c] for c in palette]
+                            palette = seaborn.color_palette("muted", n_colors=max(color)+1)
+                            # prepare for the outliers
+                            palette.append(OUTLIERCOLOR)
+
+                            c = np.array([palette[int(ci) % len(palette)] for ci in np.array(color)])
+                        elif str(color.dtype).startswith("float"):
+                            # numerical data -> color
+                            color = color-min(color)
+                            color = color/max(color)
+                            palette = [[8, 48, 107], [222, 235, 247]]
+                            palette = [[v / 255 for v in c] for c in palette]
+                            palette = np.array(palette)
+                            c = np.array([(palette[0]-palette[1])*float(ci) + palette[1] for ci in np.array(color)])
+
+                        def mean(l):
+                            return sum(l)/len(l) if len(l) > 0 else 0
+
+                        self.vis.append((mean(cs.values()), {
+                            "pnodes": {
+                                "xy": "r"+SEPERATION+SEPERATION.join([str(t) for t in xy_tpath])+SEPERATION+str(xy_coret),
+                                "color": "r"+SEPERATION+SEPERATION.join([str(t) for t in color_tpath])+SEPERATION+str(color_coret)
+                            },
+                            "chart_type": "scatter",
+                            "data": [{
+                                "x": x[i],
+                                "y": y[i],
+                                "color": c[i]
+                            } for i in range(len(color))]
+                        }))
+
+
+
+
             elif self.visdata["_chart_type"] == "bar":
                 print("waiting for implementing")
             elif self.visdata["_chart_type"] == "line":
@@ -401,7 +654,124 @@ class searchobj:
                 print("error: unexpected vis chart type")
                 raise Exception("error chat type")
 
-    def destruct(self):
+        # evaluate
+        self.vis.sort(key=lambda x: x[0], reverse=True)
+        self.vis = self.vis[:int(len(self.vis)*RECOMMENDPCT)+1]
+
+    def assembleTtree(self):
+        """
+
+        :return: {
+            "nodes": [{
+                "id": ,
+                "node_type": ,  # "D"/"V"
+                "data": {       # if "node_type" is "D"
+                    "headers": [ ]
+                }
+                "data": {       # if "node_type" is "V"
+                    "chart_type": "scatter",
+                    "data": [{
+                        "x": ,
+                        "y": ,
+                        "color":
+                    }]
+                }
+            }],
+            "edges": [{
+                "from": ,   # id
+                "to": ,     # id
+                ("data":    # )
+            }],
+            "vis_list": [{
+                "chart_type": "scatter",
+                "data": [{
+                    "x": ,
+                    "y": ,
+                    "color":
+                }],
+                "paths": {
+                    "nodes": [ ],   # id
+                    "edges": [{
+                        "from": ,   # id
+                        "to":       # id
+                    }]
+                }
+            }]
+        }
+        """
+        ret = {
+            "nodes": [],
+            "edges": [],
+            "vis_list": []
+        }
+        node_ids = ["r"]
+        ret["nodes"].append({
+            "id": "r",
+            "node_type": "D",
+            "data": {
+                "headers": self.tpathtree["r"].data
+            }
+        })
+        for vnode in self.vis:
+            vpnodes = vnode[1]["pnodes"]
+            vchart_type = vnode[1]["chart_type"]
+            vdata = vnode[1]["data"]
+            vid = vchart_type + "<VIS>" + (SEPERATION + SEPERATION).join(vpnodes.values())
+            ret["nodes"].append({
+                "id": vid,
+                "node_type": "V",
+                "data": {
+                    "chart_type": vchart_type,
+                    "data": vdata
+                }
+            })
+            ret["vis_list"].append({
+                "chart_type": vchart_type,
+                "data": vdata,
+                "paths": {
+                    "nodes": ["r", vid],
+                    "edges": []
+                }
+            })
+            for vpnode_channel in vpnodes.keys():
+                vpnode = vpnodes[vpnode_channel]
+                ts = vpnode.split(SEPERATION)
+                cid = "r"
+                for i in range(0, len(ts)-1):
+                    pid = SEPERATION.join(ts[:i+1])
+                    cid = pid + SEPERATION + ts[i+1]
+                    if cid not in node_ids:
+                        node_ids.append(cid)
+                        ret["nodes"].append({
+                            "id": cid,
+                            "node_type": "D",
+                            "data": {
+                                "headers": self.tpathtree[cid].data
+                            }
+                        })
+                        ret["edges"].append({
+                            "from": pid,
+                            "to": cid
+                        })
+                    if cid not in ret["vis_list"][-1]["paths"]["nodes"]:
+                        ret["vis_list"][-1]["paths"]["nodes"].append(cid)
+                        ret["vis_list"][-1]["paths"]["edges"].append({
+                            "from": pid,
+                            "to": cid
+                        })
+                ret["edges"].append({
+                    "from": cid,
+                    "to": vid,
+                    "data": None
+                })
+                ret["vis_list"][-1]["paths"]["edges"].append({
+                    "from": cid,
+                    "to": vid
+                })
+        return ret
+
+
+    def deconstruct(self):
         for t in self.processes.keys():
             self.processes[t].terminate()
 
@@ -409,7 +779,8 @@ class searchobj:
 
 
 if __name__ == "__main__":
-    sheet = spreadsheet("./testdata/LS1/WineQT.csv", encoding="unicode_escape", keep_default_na=False)
+    sheet = spreadsheet("./testdata/ie19b.csv", encoding="unicode_escape", keep_default_na=False)
+    #sheet = spreadsheet("./testdata/ZYF1/req0215/iris.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/NetflixOriginals.csv", encoding="unicode_escape", keep_default_na=False)
     print(sheet.data)
 
@@ -420,8 +791,8 @@ if __name__ == "__main__":
     visdata = so.assemblevisdata(round=1)
     so.showtest()
     # so.showtest(idx={"xy": [0, 1, 2], "color": [0, 1]})
-    stree = so.postsearch()
-    visdata = so.assemblevisdata(round=2)
-    so.showtest()
-    so.destruct()
+    # so.assembleandevaluevis()
+    # tree2front = so.assembleTtree()
+    # print(tree2front)
+
 
