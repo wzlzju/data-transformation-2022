@@ -79,6 +79,7 @@ def search_begin():
     visdata = sobj.assemblevisdata(round=1)
     sobj.assembleandevaluevis()
     ret = sobj.assembleTtree()
+    # sobj.deconstruct()
     return json.dumps(ret)
 
 

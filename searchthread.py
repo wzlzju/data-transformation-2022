@@ -71,8 +71,9 @@ def tpaththreadfunction(tname, colinfo, q):
         #     "kwargs": {},
         #     "index": "default"
         # })
-        while True:
-            updatequeue()
+        if MULTIPROCESS:
+            while True:
+                updatequeue()
     # elif tname == "pca":
     #     pool.append((0, tpath()))
     #     tpp = pool[0][1]
@@ -96,7 +97,8 @@ def tpaththreadfunction(tname, colinfo, q):
                     "kwargs": {"axis": 1},
                     "index": pd.Index([col, "NOMINAL "+col])
                 }])))
-                updatequeue()
+                if MULTIPROCESS:
+                    updatequeue()
     elif tname == "null_num1":
         for col in colnames:
             if coltype[col]["type"] in ["real", "int"] and not coltype[col]["iskey"]:
@@ -113,7 +115,8 @@ def tpaththreadfunction(tname, colinfo, q):
                     "index": "default"
                 })
                 pool.append((0, tpp))
-                updatequeue()
+                if MULTIPROCESS:
+                    updatequeue()
     elif tinputtype == "num":
         # e.g., pca, lda, kmeans
 
@@ -139,7 +142,8 @@ def tpaththreadfunction(tname, colinfo, q):
                     "index": "default"
                 })
                 pool.append((0, tpp))
-                updatequeue()
+                if MULTIPROCESS:
+                    updatequeue()
         # semantic matching
         clusters = colinfo["col_names_simi"]["clusters"]
         print("in thread", tname, clusters)
@@ -159,7 +163,8 @@ def tpaththreadfunction(tname, colinfo, q):
                     "index": "default"
                 })
                 pool.append((0, tpp))
-                updatequeue()
+                if MULTIPROCESS:
+                    updatequeue()
 
         # depth >= 1
         num_dim_clusters = [listintersection(cluster, numcolnames) for cluster in colinfo["dim_match"]["clusters"]]
@@ -322,8 +327,11 @@ def tpaththreadfunction(tname, colinfo, q):
     elif isinstance(tinput, list):
         pass
 
-    while True:
-        updatequeue()
+    if MULTIPROCESS:
+        while True:
+            updatequeue()
+    if not MULTIPROCESS:
+        return pool
 
 RANK_prefix = "RANKED "
 

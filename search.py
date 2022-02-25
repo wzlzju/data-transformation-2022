@@ -45,17 +45,24 @@ class searchobj:
             rept = getRepT(t)
             if rept in self.tpathpools.keys():
                 continue
-            self.tpathpools[t] = Queue(1)
-            print("start process:", t)
-            self.processes[t] = Process(target=tpaththreadfunction, args=(t, self.dataobj.colinfo, self.tpathpools[t],))
-            self.processes[t].start()
-        time.sleep(1)
+            if MULTIPROCESS:
+                self.tpathpools[t] = Queue(1)
+                print("start process:", t)
+                self.processes[t] = Process(target=tpaththreadfunction, args=(t, self.dataobj.colinfo, self.tpathpools[t],))
+                self.processes[t].start()
+            else:
+                self.tpathpools[t] = tpaththreadfunction(t, self.dataobj.colinfo, None)
+        if MULTIPROCESS:
+            time.sleep(1)
         print("in presearch:")
         for t in tlist.keys():
             if t not in numtl and t not in cattl:
                 continue
             print("\t", t)
-            ctpaths = self.tpathpools[getRepT(t)].get(True)
+            if MULTIPROCESS:
+                ctpaths = self.tpathpools[getRepT(t)].get(True)
+            else:
+                ctpaths = self.tpathpools[getRepT(t)]
             for i, (v, ctpath) in enumerate(ctpaths):
                 printTP(ctpath, TAB="\t\t")
 
@@ -207,7 +214,10 @@ class searchobj:
     def gettpath(self, t):
         if not isinstance(t, str):
             t = t["name"]
-        pool = self.tpathpools[getRepT(t)].get(True)
+        if MULTIPROCESS:
+            pool = self.tpathpools[getRepT(t)].get(True)
+        else:
+            pool = self.tpathpools[getRepT(t)]
         return pool
         # if t["name"] == "pca":
         #     return []
@@ -637,18 +647,18 @@ class searchobj:
                             },
                             "chart_type": "scatter",
                             "data": [{
-                                "x": x[i],
-                                "y": y[i],
-                                "color": c[i]
+                                "x": float(x[i]),
+                                "y": float(y[i]),
+                                "color": [float(ti) for ti in c[i]]
                             } for i in range(len(color))]
                         }))
 
 
 
 
-            elif self.visdata["_chart_type"] == "bar":
+            elif cvisd["_chart_type"].endswith("bar"):
                 print("waiting for implementing")
-            elif self.visdata["_chart_type"] == "line":
+            elif cvisd["_chart_type"].endswith("line"):
                 print("waiting for implementing")
             else:
                 print("error: unexpected vis chart type")
@@ -772,8 +782,9 @@ class searchobj:
 
 
     def deconstruct(self):
-        for t in self.processes.keys():
-            self.processes[t].terminate()
+        if MULTIPROCESS:
+            for t in self.processes.keys():
+                self.processes[t].terminate()
 
 
 
@@ -789,10 +800,10 @@ if __name__ == "__main__":
     so.postsearchinitialization()
     stree = so.postsearch()
     visdata = so.assemblevisdata(round=1)
-    so.showtest()
+    #so.showtest()
     # so.showtest(idx={"xy": [0, 1, 2], "color": [0, 1]})
-    # so.assembleandevaluevis()
-    # tree2front = so.assembleTtree()
-    # print(tree2front)
+    so.assembleandevaluevis()
+    tree2front = so.assembleTtree()
+    print(tree2front)
 
 
