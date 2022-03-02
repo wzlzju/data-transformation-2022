@@ -857,10 +857,11 @@ class searchobj:
                             printTP(y_tpath, TAB="")
 
                         # reduce y
+                        RANK_prefix = "RANKED "
                         if len(y.columns) > MAXBARNUMINCHART:
                             tarcol = list(y.columns)[:MAXBARNUMINCHART]
                             for col in list(y.columns)[MAXBARNUMINCHART:]:
-                                if col not in self.dataobj.data.columns:
+                                if col not in self.dataobj.data.columns and col.replace(RANK_prefix, "") not in self.dataobj.data.columns:
                                     tarcol.append(col)
                             y = y[tarcol]
 
@@ -941,10 +942,11 @@ class searchobj:
                             printTP(y_tpath, TAB="")
 
                         # reduce y
+                        RANK_prefix = "RANKED "
                         if len(y.columns) > MAXLINENUMINCHART:
                             tarcol = list(y.columns)[:MAXLINENUMINCHART]
                             for col in list(y.columns)[MAXLINENUMINCHART:]:
-                                if col not in self.dataobj.data.columns:
+                                if col not in self.dataobj.data.columns and col.replace(RANK_prefix, "") not in self.dataobj.data.columns:
                                     tarcol.append(col)
                             y = y[tarcol]
 
@@ -1052,10 +1054,11 @@ class searchobj:
                                 printTP(y_tpath, TAB="")
 
                             # reduce y
+                            RANK_prefix = "RANKED "
                             if len(y.columns) > MAXLINENUMINCHART:
                                 tarcol = list(y.columns)[:MAXLINENUMINCHART]
                                 for col in list(y.columns)[MAXLINENUMINCHART:]:
-                                    if col not in self.dataobj.data.columns:
+                                    if col not in self.dataobj.data.columns and col.replace(RANK_prefix, "") not in self.dataobj.data.columns:
                                         tarcol.append(col)
                                 y = y[tarcol]
 
@@ -1274,8 +1277,8 @@ class searchobj:
 
 
 if __name__ == "__main__":
-    sheet = spreadsheet("./testdata/ie19b.csv", encoding="unicode_escape", keep_default_na=False)
-    # sheet = spreadsheet("./testdata/training1.csv", encoding="unicode_escape", keep_default_na=False)
+    # sheet = spreadsheet("./testdata/ie19b.csv", encoding="unicode_escape", keep_default_na=False)
+    sheet = spreadsheet("./testdata/training2.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/ZYF1/req0215/iris.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/NetflixOriginals.csv", encoding="unicode_escape", keep_default_na=False)
     print(sheet.data)
@@ -1285,7 +1288,7 @@ if __name__ == "__main__":
     so.postsearchinitialization()
     stree = so.postsearch()
     visdata = so.assemblevisdata(round=1)
-    # so.showtest()
+    so.showtest()
     # so.showtest(idx={"xy": [0, 1, 2], "color": [0, 1]})
     so.assembleandevaluevis()
     tree2front = so.assembleTtree()
