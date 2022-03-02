@@ -213,6 +213,9 @@ def w2v(words, stype="single"):
         raise Exception("error unexpected type")
 
 
+def mean(l):
+    return sum(l) / len(l) if len(l) > 0 else 0
+
 
 if __name__ == "__main__":
     d1 = pd.read_csv("./testdata/NetflixOriginals.csv", encoding="unicode_escape")

@@ -54,12 +54,35 @@ def plda(data, n_components=4):
     cvecdata = cntVector.fit_transform(tdata)
     lda = LatentDirichletAllocation(n_components=n_components)
     ldares = lda.fit_transform(cvecdata)
-    res = np.argmax(ldares, axis=1)
+    t_v_contri = lda.components_
+    t_v_contri = t_v_contri / t_v_contri.sum(axis=1).reshape((len(t_v_contri), 1))
+    t_v_rank = np.argsort(t_v_contri, axis=1)
+    v = cntVector.get_feature_names()
+    voc = [removetokenincolname(s) for s in v]
+    tss = []
+    for i in range(len(t_v_contri)):
+        ctc = t_v_contri[i]
+        ctr = t_v_rank[i]
+        idx1 = ctr[-1]
+        idx2 = ctr[-2]
+        idx3 = ctr[-3]
+        s1 = str(ctc[idx1])[:6] + "*" + voc[idx1]
+        s2 = str(ctc[idx2])[:6] + "*" + voc[idx2]
+        s3 = str(ctc[idx3])[:6] + "*" + voc[idx3]
+        tss.append(s1 + " + " + s2 + " + " + s3)
+    res = np.array([tss[t] for t in np.argmax(ldares, axis=1)])
     return res
 
 def clean_col_name(s):
     return (s[1:] if s.startswith(" ") else s).replace(':', '_').replace(',', "_").replace(';', '_').replace('.', '_').replace('?', '_').replace('/', '_')\
         .replace('*', '_').replace('!', '_').replace('(', '_').replace(')', '_').replace(' ', '_')
+
+def removetokenincolname(s):
+    if s.startswith("token"):
+        s = s[6:]
+    while len(s) > 1 and s[0] in [str(i) for i in range(10)]:
+        s = s[1:]
+    return s
 
 def pdbscan(data, eps=0.25, min_samples=5):
     data = (data - data.min()) / (data.max() - data.min())

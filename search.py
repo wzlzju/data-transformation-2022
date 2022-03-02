@@ -358,6 +358,21 @@ class searchobj:
                         if cvisd["_chart_type"] == "cat_scatter":
                             if color.dtype == "float64":
                                 color = color.astype("int64")
+                            cat2legend = {}
+                            if color.dtype == "int64":
+                                for co in np.unique(color.values):
+                                    if co < 0:
+                                        cat2legend[co] = "outliers"
+                                    else:
+                                        cat2legend[co] = "cluster "+str(co+1)
+                            elif color.dtype == "object":
+                                idata = color
+                                if isinstance(idata, pd.Series):
+                                    idata = pd.DataFrame(idata)
+                                categoriesset = np.unique(idata.values)
+                                cat2legend = {idx: lege for idx, lege in enumerate(categoriesset)}
+                                odata = idata.apply(lambda x: int(np.argwhere(categoriesset == x.values)), axis=1)
+                                color = odata
                             if DEBUG:
                                 if len(np.unique(color[color >= 0].values)) > 1:
                                     print("\tCDM:", score.CDM(xy.values, color.values))
@@ -370,17 +385,18 @@ class searchobj:
                             if color.dtype == "int64":
                                 color = color.astype("float64")
 
-                        g = score.dotGraph(xy.values)
-                        g.minSpanTree()
-                        print(g.outlying_value())
-                        print(g.skew_value())
-                        print(g.striated_value())
-                        print(g.stringy_value())
-                        print(g.straight_value())
-                        print(g.spearman_value())
-                        print(g.clumpy_value())
+                        # g = score.dotGraph(xy.values)
+                        # g.minSpanTree()
+                        # print(g.outlying_value())
+                        # print(g.skew_value())
+                        # print(g.striated_value())
+                        # print(g.stringy_value())
+                        # print(g.straight_value())
+                        # print(g.spearman_value())
+                        # print(g.clumpy_value())
 
                         # color data -> color  --from palette
+                        legend2color = {}
                         if str(color.dtype).startswith("int"):
                             # nominal data -> color
                             # palette = [[141, 211, 199], [255, 255, 179], [190, 186, 218], [251, 128, 114], [128, 177, 211],
@@ -391,6 +407,8 @@ class searchobj:
                             palette.append(OUTLIERCOLOR)
 
                             c = np.array([palette[int(ci) % len(palette)] for ci in np.array(color)])
+                            for cat in cat2legend.keys():
+                                legend2color[cat2legend[cat]] = palette[int(cat) % len(palette)]
                         elif str(color.dtype).startswith("float"):
                             # numerical data -> color
                             color = color-min(color)
@@ -437,13 +455,108 @@ class searchobj:
 
                         fig.canvas.mpl_connect("motion_notify_event", hover)
 
+                        plt.xlabel(xy.columns[0])
+                        plt.ylabel(xy.columns[1])
                         plt.show()
 
 
             elif cvisd["_chart_type"].endswith("bar"):
-                print("waiting for implementing")
+                xs = cvisd["x"]
+                ys = cvisd["y"]
+
+                for ii, x_obj in enumerate(xs):
+                    x = x_obj["data"]
+                    x_coret = x_obj["coret"]
+                    x_tpath = x_obj["tpath"]
+                    if tocontinue(ii, idx, "x"):
+                        continue
+                    if isinstance(x, pd.DataFrame):
+                        pass
+                    elif isinstance(x, pd.Series):
+                        x = pd.DataFrame(x)
+                    else:
+                        print("error: unexpected y format. excepted pandas.DataFrame, but got",
+                              type(x), "in <class searchobj><func showtest><branch line>")
+                        raise Exception("error unexpected color format")
+
+                    if DEBUG:
+                        print("x:")
+                        print("core T:", x_coret)
+                        printTP(x_tpath, TAB="")
+
+                    x.columns = pd.Index(["Category by "+x_coret["name"].upper()])
+
+                    for jj, y_obj in enumerate(ys):
+                        y = y_obj["data"]
+                        y_coret = y_obj["coret"]
+                        y_tpath = y_obj["tpath"]
+                        if tocontinue(jj, idx, "y"):
+                            continue
+                        if isinstance(y, pd.DataFrame):
+                            pass
+                        elif isinstance(y, pd.Series):
+                            y = pd.DataFrame(y)
+                        else:
+                            print("error: unexpected y format. excepted pandas.DataFrame, but got",
+                                  type(y), "in <class searchobj><func showtest><branch line>")
+                            raise Exception("error unexpected color format")
+
+                        if DEBUG:
+                            print("y:")
+                            print("core T:", y_coret)
+                            printTP(y_tpath, TAB="")
+
+                        # reduce y
+                        if len(y.columns) > MAXBARNUMINCHART:
+                            tarcol = list(y.columns)[:MAXBARNUMINCHART]
+                            for col in list(y.columns)[MAXBARNUMINCHART:]:
+                                if col not in self.dataobj.data.columns:
+                                    tarcol.append(col)
+                            y = y[tarcol]
+
+                        tmpxy = pd.concat([x, y], axis=1)
+                        groups = tmpxy.groupby(x.columns[0])
+                        y = None
+                        for xcat, gy in groups:
+                            if cvisd["_chart_type"].startswith("sum"):
+                                gy = gy.select_dtypes(include=["int", "float"])
+                                gya = gy.agg(sum)
+                                gya[x.columns[0]] = xcat
+                                ny = pd.DataFrame(gya.values.reshape(1, len(gya)), columns=pd.Index(["SUM(%s)" % i for i in gya.index]))
+                                if y is None:
+                                    y = ny
+                                else:
+                                    y = pd.concat([y, ny])
+                            elif cvisd["_chart_type"].startswith("count"):
+                                ny = pd.DataFrame([[len(gy), xcat]], columns=pd.Index(["COUNT", x.columns[0]]))
+                                if y is None:
+                                    y = ny
+                                else:
+                                    y = pd.concat([y, ny])
+                        ndata = y
+
+                        def create_multi_bars(labels, datas, xlabel="", ylabel="", legend=None, tick_step=1, group_gap=0.2, bar_gap=0):
+                            ticks = np.arange(len(labels)) * tick_step
+                            group_num = len(datas)
+                            group_width = tick_step - group_gap
+                            bar_span = group_width / group_num
+                            bar_width = bar_span - bar_gap
+                            baseline_x = ticks - (group_width - bar_span) / 2
+                            for index, y in enumerate(datas):
+                                plt.bar(baseline_x + index * bar_span, y, bar_width, label= legend[index] if legend is not None else str(index))
+                            plt.xlabel(xlabel)
+                            plt.ylabel(ylabel)
+                            plt.xticks(ticks, labels)
+                            plt.legend()
+                            plt.show()
+                        create_multi_bars(ndata[ndata.columns[-1]].values,
+                                          ndata[ndata.columns[:-1]].values.T,
+                                          xlabel=ndata.columns[-1],
+                                          ylabel="",
+                                          legend=list(ndata.columns[:-1]))
+
             elif cvisd["_chart_type"].endswith("line"):
-                if cvisd["_chart_type"] == "ord_line":
+                if cvisd["_chart_type"].startswith("ord"):
                     ys = cvisd["y"]
 
                     for ii, y_obj in enumerate(ys):
@@ -466,13 +579,23 @@ class searchobj:
                             print("core T:", y_coret)
                             printTP(y_tpath, TAB="")
 
+                        # reduce y
+                        if len(y.columns) > MAXLINENUMINCHART:
+                            tarcol = list(y.columns)[:MAXLINENUMINCHART]
+                            for col in list(y.columns)[MAXLINENUMINCHART:]:
+                                if col not in self.dataobj.data.columns:
+                                    tarcol.append(col)
+                            y = y[tarcol]
+
                         x = range(len(y))
                         plt.figure()
                         for col in y.columns:
                             plt.plot(x, y[col], label=col)
                             plt.legend()
+                        if len(y.columns) == 1:
+                            plt.ylabel(y.columns[0])
                         plt.show()
-                elif cvisd["_chart_type"] == "rel_line":
+                elif cvisd["_chart_type"].startswith("rel"):
                     xs = cvisd["x"]
                     ys = cvisd["y"]
 
@@ -519,6 +642,14 @@ class searchobj:
                                 print("core T:", y_coret)
                                 printTP(y_tpath, TAB="")
 
+                            # reduce y
+                            if len(y.columns) > MAXLINENUMINCHART:
+                                tarcol = list(y.columns)[:MAXLINENUMINCHART]
+                                for col in list(y.columns)[MAXLINENUMINCHART:]:
+                                    if col not in self.dataobj.data.columns:
+                                        tarcol.append(col)
+                                y = y[tarcol]
+
                             tmpxy = pd.concat([x, y], axis=1)
                             tmpxy = tmpxy.sort_values(by=tmpxy.columns[0])
                             tmpx = tmpxy[tmpxy.columns[0]]
@@ -528,6 +659,8 @@ class searchobj:
                                 plt.plot(tmpx, tmpy[col], label=col)
                                 plt.legend()
                             plt.xlabel(tmpxy.columns[0].replace(sortTOKEN, ""))
+                            if len(y.columns) == 1:
+                                plt.ylabel(y.columns[0])
                             plt.show()
             else:
                 print("error: unexpected vis chart type")
@@ -539,7 +672,12 @@ class searchobj:
         :param: idx: only show V in idx
                         None: show all
         """
-        self.vis = []
+        self.visbuffer = {
+            "scatter": [],
+            "line": [],
+            "cat_line": [],
+            "bar": []
+        }
         for _, cvisd in enumerate(self.visdata):
             if cvisd["_chart_type"].endswith("scatter"):
                 xys = cvisd["xy"]
@@ -598,9 +736,24 @@ class searchobj:
                             raise Exception("error unexpected color format")
 
                         cs = {}
+                        cat2legend = {}
                         if cvisd["_chart_type"] == "cat_scatter":
                             if color.dtype == "float64":
                                 color = color.astype("int64")
+                            if color.dtype == "int64":
+                                for co in np.unique(color.values):
+                                    if co < 0:
+                                        cat2legend[co] = "outliers"
+                                    else:
+                                        cat2legend[co] = "cluster " + str(co + 1)
+                            elif color.dtype == "object":
+                                idata = color
+                                if isinstance(idata, pd.Series):
+                                    idata = pd.DataFrame(idata)
+                                categoriesset = np.unique(idata.values)
+                                cat2legend = {idx: lege for idx, lege in enumerate(categoriesset)}
+                                odata = idata.apply(lambda x: int(np.argwhere(categoriesset == x.values)), axis=1)
+                                color = odata
                             if DEBUG:
                                 if len(np.unique(color[color >= 0].values)) > 1:
                                     cs["CDM"] = score.CDM(xy.values, color.values)
@@ -618,6 +771,7 @@ class searchobj:
                             cs["CDM"] = score.CDM(xy.values, tmpcolor.values)
 
                         # color data -> color  --from palette
+                        legend2color = {}
                         if str(color.dtype).startswith("int"):
                             # nominal data -> color
                             # palette = [[141, 211, 199], [255, 255, 179], [190, 186, 218], [251, 128, 114], [128, 177, 211],
@@ -628,6 +782,8 @@ class searchobj:
                             palette.append(OUTLIERCOLOR)
 
                             c = np.array([palette[int(ci) % len(palette)] for ci in np.array(color)])
+                            for cat in cat2legend.keys():
+                                legend2color[cat2legend[cat]] = palette[int(cat) % len(palette)]
                         elif str(color.dtype).startswith("float"):
                             # numerical data -> color
                             color = color-min(color)
@@ -637,10 +793,7 @@ class searchobj:
                             palette = np.array(palette)
                             c = np.array([(palette[0]-palette[1])*float(ci) + palette[1] for ci in np.array(color)])
 
-                        def mean(l):
-                            return sum(l)/len(l) if len(l) > 0 else 0
-
-                        self.vis.append((mean(cs.values()), {
+                        self.visbuffer["scatter"].append((mean(cs.values()), {
                             "pnodes": {
                                 "xy": "r"+SEPERATION+SEPERATION.join([str(t) for t in xy_tpath])+SEPERATION+str(xy_coret),
                                 "color": "r"+SEPERATION+SEPERATION.join([str(t) for t in color_tpath])+SEPERATION+str(color_coret)
@@ -649,28 +802,347 @@ class searchobj:
                             "data": [{
                                 "x": float(x[i]),
                                 "y": float(y[i]),
-                                "color": [float(ti) for ti in c[i]]
-                            } for i in range(len(color))]
+                                "color": [float(ti) for ti in c[i]],
+                                "text": str((self.dataobj.data[self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[i])
+                            } for i in range(len(color))],
+                            "legend": legend2color,
+                            "xlabel": xy.columns[0],
+                            "ylabel": xy.columns[1]
                         }))
 
-
-
-
             elif cvisd["_chart_type"].endswith("bar"):
-                print("waiting for implementing")
+                xs = cvisd["x"]
+                ys = cvisd["y"]
+
+                for ii, x_obj in enumerate(xs):
+                    x = x_obj["data"]
+                    x_coret = x_obj["coret"]
+                    x_tpath = x_obj["tpath"]
+                    if tocontinue(ii, idx, "x"):
+                        continue
+                    if isinstance(x, pd.DataFrame):
+                        pass
+                    elif isinstance(x, pd.Series):
+                        x = pd.DataFrame(x)
+                    else:
+                        print("error: unexpected y format. excepted pandas.DataFrame, but got",
+                              type(x), "in <class searchobj><func showtest><branch line>")
+                        raise Exception("error unexpected color format")
+
+                    if DEBUG:
+                        print("x:")
+                        print("core T:", x_coret)
+                        printTP(x_tpath, TAB="")
+
+                    x.columns = pd.Index(["Category by " + x_coret["name"].upper()])
+
+                    for jj, y_obj in enumerate(ys):
+                        y = y_obj["data"]
+                        y_coret = y_obj["coret"]
+                        y_tpath = y_obj["tpath"]
+                        if tocontinue(jj, idx, "y"):
+                            continue
+                        if isinstance(y, pd.DataFrame):
+                            pass
+                        elif isinstance(y, pd.Series):
+                            y = pd.DataFrame(y)
+                        else:
+                            print("error: unexpected y format. excepted pandas.DataFrame, but got",
+                                  type(y), "in <class searchobj><func showtest><branch line>")
+                            raise Exception("error unexpected color format")
+
+                        if DEBUG:
+                            print("y:")
+                            print("core T:", y_coret)
+                            printTP(y_tpath, TAB="")
+
+                        # reduce y
+                        if len(y.columns) > MAXBARNUMINCHART:
+                            tarcol = list(y.columns)[:MAXBARNUMINCHART]
+                            for col in list(y.columns)[MAXBARNUMINCHART:]:
+                                if col not in self.dataobj.data.columns:
+                                    tarcol.append(col)
+                            y = y[tarcol]
+
+                        tmpxy = pd.concat([x, y], axis=1)
+                        groups = tmpxy.groupby(x.columns[0])
+                        y = None
+                        for xcat, gy in groups:
+                            if cvisd["_chart_type"].startswith("sum"):
+                                gy = gy.select_dtypes(include=["int", "float"])
+                                gya = gy.agg(sum)
+                                gya[x.columns[0]] = xcat
+                                ny = pd.DataFrame(gya.values.reshape(1, len(gya)),
+                                                  columns=pd.Index(["SUM(%s)" % i for i in gya.index]))
+                                if y is None:
+                                    y = ny
+                                else:
+                                    y = pd.concat([y, ny])
+                            elif cvisd["_chart_type"].startswith("count"):
+                                ny = pd.DataFrame([[len(gy), xcat]], columns=pd.Index(["COUNT", x.columns[0]]))
+                                if y is None:
+                                    y = ny
+                                else:
+                                    y = pd.concat([y, ny])
+                        y.index = pd.RangeIndex(len(y))
+                        ndata = y
+                        y = y[y.columns[:-1]]
+                        y = y.astype("float64")
+
+                        cs = {}
+
+                        cs["outno1"] = mean([score.significance_outstanding1(y[col].values) for col in y.columns])
+                        cs["lincor"] = mean([score.significance_linearcorrelation(y[col].values) for col in y.columns])
+                        if len(y.columns) >= 2:
+                            corl = []
+                            for i in range(len(y.columns) - 1):
+                                for j in range(i + 1, len(y.columns)):
+                                    corl.append(score.significance_correlation(np.array([y[y.columns[i]].values, y[y.columns[j]].values])))
+                            cs["cor"] = mean(corl)
+
+                        self.visbuffer["bar"].append((mean(cs.values()), {
+                            "pnodes": {
+                                "y": "r" + SEPERATION + SEPERATION.join([str(t) for t in y_tpath]) + SEPERATION + str(
+                                    y_coret)
+                            },
+                            "chart_type": "bar",
+                            "data": [{
+                                "x": ndata[ndata.columns[-1]][i],
+                                "y": [float(y[col][i]) for col in y.columns],
+                                "text": ""
+                            } for i in range(len(y))],
+                            "legend": list(y.columns),
+                            "xlabel": ndata.columns[-1],
+                            "ylabel": ""
+                        }))
+
             elif cvisd["_chart_type"].endswith("line"):
-                print("waiting for implementing")
+                if cvisd["_chart_type"].startswith("ord"):
+                    ys = cvisd["y"]
+
+                    for ii, y_obj in enumerate(ys):
+                        y = y_obj["data"]
+                        y_coret = y_obj["coret"]
+                        y_tpath = y_obj["tpath"]
+                        if tocontinue(ii, idx, "y"):
+                            continue
+                        if isinstance(y, pd.DataFrame):
+                            pass
+                        elif isinstance(y, pd.Series):
+                            y = pd.DataFrame(y)
+                        else:
+                            print("error: unexpected y format. excepted pandas.DataFrame, but got",
+                                  type(y), "in <class searchobj><func showtest><branch line>")
+                            raise Exception("error unexpected color format")
+
+                        if DEBUG:
+                            print("y:")
+                            print("core T:", y_coret)
+                            printTP(y_tpath, TAB="")
+
+                        # reduce y
+                        if len(y.columns) > MAXLINENUMINCHART:
+                            tarcol = list(y.columns)[:MAXLINENUMINCHART]
+                            for col in list(y.columns)[MAXLINENUMINCHART:]:
+                                if col not in self.dataobj.data.columns:
+                                    tarcol.append(col)
+                            y = y[tarcol]
+
+                        catflag = False
+                        yaxis = {}
+                        if y.values.dtype == "object" and len(y.columns) == 1:
+                            catflag = True
+                            dataeleset = np.unique(y.values)
+                            yaxis = {i+1: e for i, e in enumerate(dataeleset)}
+                            data = np.array([int(np.argwhere(dataeleset == i)) + 1 for i in y.values])
+                            y = pd.DataFrame(data, columns=y.columns)
+
+                        cs = {}
+                        x = list(range(len(y)))
+
+                        cs["outno1"] = mean([score.significance_outstanding1(y[col].values) for col in y.columns])
+                        cs["lincor"] = mean([score.significance_linearcorrelation(y[col].values) for col in y.columns])
+                        if len(y.columns) >= 2:
+                            corl = []
+                            for i in range(len(y.columns) - 1):
+                                for j in range(i + 1, len(y.columns)):
+                                    corl.append(score.significance_correlation(np.array([y[y.columns[i]].values, y[y.columns[j]].values])))
+                            cs["cor"] = mean(corl)
+
+                        if not catflag:
+                            self.visbuffer["line"].append((mean(cs.values()), {
+                                "pnodes": {
+                                    "y": "r" + SEPERATION + SEPERATION.join([str(t) for t in y_tpath]) + SEPERATION + str(y_coret)
+                                },
+                                "chart_type": "line",
+                                "data": [{
+                                    "x": x[i],
+                                    "y": [float(y[col][i]) for col in y.columns],
+                                    "text": str((self.dataobj.data[
+                                        self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[i])
+                                } for i in range(len(y))],
+                                "legend": list(y.columns),
+                                "xlabel": "",
+                                "ylabel": y.columns[0] if len(y.columns) == 1 else ""
+                            }))
+                        else:
+                            self.visbuffer["cat_line"].append((mean(cs.values()), {
+                                "pnodes": {
+                                    "y": "r" + SEPERATION + SEPERATION.join(
+                                        [str(t) for t in y_tpath]) + SEPERATION + str(y_coret)
+                                },
+                                "chart_type": "cat_line",
+                                "data": [{
+                                    "x": x[i],
+                                    "y": [int(y[col][i]) for col in y.columns],
+                                    "text": str((self.dataobj.data[
+                                        self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[i])
+                                } for i in range(len(y))],
+                                "legend": list(y.columns),
+                                "xlabel": "",
+                                "ylabel": y.columns[0] if len(y.columns) == 1 else "",
+                                "yaxis": yaxis
+                            }))
+
+                elif cvisd["_chart_type"].startswith("rel"):
+                    xs = cvisd["x"]
+                    ys = cvisd["y"]
+
+                    for ii, x_obj in enumerate(xs):
+                        x = x_obj["data"]
+                        x_coret = x_obj["coret"]
+                        x_tpath = x_obj["tpath"]
+                        if tocontinue(ii, idx, "x"):
+                            continue
+                        if isinstance(x, pd.DataFrame):
+                            pass
+                        elif isinstance(x, pd.Series):
+                            x = pd.DataFrame(x)
+                        else:
+                            print("error: unexpected y format. excepted pandas.DataFrame, but got",
+                                  type(x), "in <class searchobj><func showtest><branch line>")
+                            raise Exception("error unexpected color format")
+
+                        if DEBUG:
+                            print("x:")
+                            print("core T:", x_coret)
+                            printTP(x_tpath, TAB="")
+
+                        sortTOKEN = "<SORTBY>"
+                        x.columns = pd.Index([sortTOKEN + x.columns[0]])
+
+                        for jj, y_obj in enumerate(ys):
+                            y = y_obj["data"]
+                            y_coret = y_obj["coret"]
+                            y_tpath = y_obj["tpath"]
+                            if tocontinue(jj, idx, "y"):
+                                continue
+                            if isinstance(y, pd.DataFrame):
+                                pass
+                            elif isinstance(y, pd.Series):
+                                y = pd.DataFrame(y)
+                            else:
+                                print("error: unexpected y format. excepted pandas.DataFrame, but got",
+                                      type(y), "in <class searchobj><func showtest><branch line>")
+                                raise Exception("error unexpected color format")
+
+                            if DEBUG:
+                                print("y:")
+                                print("core T:", y_coret)
+                                printTP(y_tpath, TAB="")
+
+                            # reduce y
+                            if len(y.columns) > MAXLINENUMINCHART:
+                                tarcol = list(y.columns)[:MAXLINENUMINCHART]
+                                for col in list(y.columns)[MAXLINENUMINCHART:]:
+                                    if col not in self.dataobj.data.columns:
+                                        tarcol.append(col)
+                                y = y[tarcol]
+
+                            catflag = False
+                            yaxis = {}
+                            if y.values.dtype == "object" and len(y.columns) == 1:
+                                catflag = True
+                                dataeleset = np.unique(y.values)
+                                yaxis = {i + 1: e for i, e in enumerate(dataeleset)}
+                                data = np.array([int(np.argwhere(dataeleset == i)) + 1 for i in y.values])
+                                y = pd.DataFrame(data, columns=y.columns)
+
+                            tmpxy = pd.concat([x, y], axis=1)
+                            tmpxy = tmpxy.sort_values(by=tmpxy.columns[0])
+                            xrank = x[x.columns[0]].rank()
+                            tmpx = tmpxy[tmpxy.columns[0]]
+                            tmpy = tmpxy[tmpxy.columns[1:]]
+
+                            cs = {}
+
+                            cs["outno1"] = mean([score.significance_outstanding1(tmpy[col].values) for col in tmpy.columns])
+                            cs["lincor"] = mean([score.significance_linearcorrelation(tmpy[col].values) for col in tmpy.columns])
+                            if len(y.columns) >= 2:
+                                corl = []
+                                for i in range(len(tmpy.columns) - 1):
+                                    for j in range(i + 1, len(tmpy.columns)):
+                                        corl.append(score.significance_correlation(
+                                            np.array([tmpy[tmpy.columns[i]].values, tmpy[tmpy.columns[j]].values])))
+                                cs["cor"] = mean(corl)
+
+                            if not catflag:
+                                self.visbuffer["line"].append((mean(cs.values()), {
+                                    "pnodes": {
+                                        "x": "r" + SEPERATION + SEPERATION.join(
+                                            [str(t) for t in x_tpath]) + SEPERATION + str(x_coret),
+                                        "y": "r" + SEPERATION + SEPERATION.join(
+                                            [str(t) for t in y_tpath]) + SEPERATION + str(y_coret)
+                                    },
+                                    "chart_type": "line",
+                                    "data": [{
+                                        "x": tmpx[i],
+                                        "y": [float(tmpy[col][i]) for col in tmpy.columns],
+                                        "text": str((self.dataobj.data[
+                                            self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[int(np.argwhere(xrank.values==(i+1)))])
+                                    } for i in range(len(tmpy))],
+                                    "legend": list(tmpy.columns),
+                                    "xlabel": tmpxy.columns[0].replace(sortTOKEN, ""),
+                                    "ylabel": tmpy.columns[0] if len(tmpy.columns) == 1 else ""
+                                }))
+                            else:
+                                self.visbuffer["cat_line"].append((mean(cs.values()), {
+                                    "pnodes": {
+                                        "x": "r" + SEPERATION + SEPERATION.join(
+                                            [str(t) for t in x_tpath]) + SEPERATION + str(x_coret),
+                                        "y": "r" + SEPERATION + SEPERATION.join(
+                                            [str(t) for t in y_tpath]) + SEPERATION + str(y_coret)
+                                    },
+                                    "chart_type": "cat_line",
+                                    "data": [{
+                                        "x": tmpx[i],
+                                        "y": [int(tmpy[col][i]) for col in tmpy.columns],
+                                        "text": str((self.dataobj.data[
+                                            self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[
+                                                        int(np.argwhere(xrank.values == (i + 1)))])
+                                    } for i in range(len(tmpy))],
+                                    "legend": list(tmpy.columns),
+                                    "xlabel": tmpxy.columns[0].replace(sortTOKEN, ""),
+                                    "ylabel": tmpy.columns[0] if len(tmpy.columns) == 1 else "",
+                                    "yaxis": yaxis
+                                }))
+
             else:
                 print("error: unexpected vis chart type")
                 raise Exception("error chat type")
 
         # evaluate
-        self.vis.sort(key=lambda x: x[0], reverse=True)
-        self.vis = self.vis[:int(len(self.vis)*RECOMMENDPCT)+1]
+        self.visbuffer["scatter"].sort(key=lambda x: x[0], reverse=True)
+        self.visbuffer["line"].sort(key=lambda x: x[0], reverse=True)
+        self.visbuffer["cat_line"].sort(key=lambda x: x[0], reverse=True)
+        self.visbuffer["bar"].sort(key=lambda x: x[0], reverse=True)
+        self.vis = self.visbuffer["scatter"][:min(int(len(self.visbuffer["scatter"])*RECOMMENDPCT)+1, MAXSCATTER)] + \
+                    self.visbuffer["line"][:min(int(len(self.visbuffer["line"]) * RECOMMENDPCT) + 1, MAXLINE)] + \
+                    self.visbuffer["cat_line"][:min(int(len(self.visbuffer["cat_line"]) * RECOMMENDPCT) + 1, MAXCATLINE)] + \
+                    self.visbuffer["bar"][:min(int(len(self.visbuffer["bar"]) * RECOMMENDPCT) + 1, MAXBAR)]
 
     def assembleTtree(self):
         """
-
         :return: {
             "nodes": [{
                 "id": ,
@@ -726,18 +1198,30 @@ class searchobj:
             vpnodes = vnode[1]["pnodes"]
             vchart_type = vnode[1]["chart_type"]
             vdata = vnode[1]["data"]
+            vlegend = vnode[1]["legend"]
+            vxlabel = vnode[1]["xlabel"]
+            vylabel = vnode[1]["ylabel"]
+            vyaxis =  vnode[1].get("yaxis", {})
             vid = vchart_type + "<VIS>" + (SEPERATION + SEPERATION).join(vpnodes.values())
             ret["nodes"].append({
                 "id": vid,
                 "node_type": "V",
                 "data": {
                     "chart_type": vchart_type,
-                    "data": vdata
+                    "data": vdata,
+                    "legend": vlegend,
+                    "xlabel": vxlabel,
+                    "ylabel": vylabel,
+                    "yaxis": vyaxis
                 }
             })
             ret["vis_list"].append({
                 "chart_type": vchart_type,
                 "data": vdata,
+                "legend": vlegend,
+                "xlabel": vxlabel,
+                "ylabel": vylabel,
+                "yaxis": vyaxis,
                 "paths": {
                     "nodes": ["r", vid],
                     "edges": []
@@ -791,6 +1275,7 @@ class searchobj:
 
 if __name__ == "__main__":
     sheet = spreadsheet("./testdata/ie19b.csv", encoding="unicode_escape", keep_default_na=False)
+    # sheet = spreadsheet("./testdata/training1.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/ZYF1/req0215/iris.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/NetflixOriginals.csv", encoding="unicode_escape", keep_default_na=False)
     print(sheet.data)
@@ -800,7 +1285,7 @@ if __name__ == "__main__":
     so.postsearchinitialization()
     stree = so.postsearch()
     visdata = so.assemblevisdata(round=1)
-    #so.showtest()
+    # so.showtest()
     # so.showtest(idx={"xy": [0, 1, 2], "color": [0, 1]})
     so.assembleandevaluevis()
     tree2front = so.assembleTtree()

@@ -123,25 +123,25 @@ def Tpca(data, para):
     ndata = data.select_dtypes(include=["int", "float"])
     res = ppca(ndata, **para)   # numpy result
 
-    return pd.DataFrame(res)
+    return pd.DataFrame(res, columns=pd.Index(["PC1", "PC2"]))
 
 def Ttsne(data, para):
     ndata = data.select_dtypes(include=["int", "float"])
     res = ptsne(ndata, **para)  # numpy result
 
-    return pd.DataFrame(res).astype("float64")
+    return pd.DataFrame(res, columns=pd.Index(["tSNE-1", "tSNE-2"])).astype("float64")
 
 def Tmds(data, para):
     ndata = data.select_dtypes(include=["int", "float"])
     res = pmds(ndata, **para)  # numpy result
 
-    return pd.DataFrame(res).astype("float64")
+    return pd.DataFrame(res, columns=pd.Index(["MDS-1", "MDS-2"])).astype("float64")
 
 def Tumap(data, para):
     ndata = data.select_dtypes(include=["int", "float"])
     res = pumap(ndata, **para)  # numpy result
 
-    return pd.DataFrame(res).astype("float64")
+    return pd.DataFrame(res, columns=pd.Index(["UMAP-1", "UMAP-2"])).astype("float64")
 
 def Tlda(data, para):
     ndata = data.select_dtypes(include=["int", "float"])
@@ -162,7 +162,15 @@ def Tkmeans(data, para):
     return pd.Series(res).astype("int64")
 
 def Tnull(data, para):
+    ndata = data
+    return ndata
+
+def Tnullnum(data, para):
     ndata = data.select_dtypes(include=["int", "float"])
+    return ndata
+
+def Tnullcat(data, para):
+    ndata = data.select_dtypes(include=["object"])
     return ndata
 
 def Ttest(data, para):

@@ -88,14 +88,23 @@ def tpaththreadfunction(tname, colinfo, q):
     if tname == "null_nom1":
         for col in colnames:
             if coltype[col]["type"] == "nominal" and not coltype[col]["iskey"]:
+                # pool.append((0, tpath([{
+                #     "t": "nominalize",
+                #     "i_type": "==",
+                #     "i": [col],
+                #     "o_type": "new_table",
+                #     "args": (),
+                #     "kwargs": {"axis": 1},
+                #     "index": pd.Index([col, "NOMINAL "+col])
+                # }])))
                 pool.append((0, tpath([{
-                    "t": "nominalize",
+                    "t": "select",
                     "i_type": "==",
                     "i": [col],
                     "o_type": "new_table",
                     "args": (),
-                    "kwargs": {"axis": 1},
-                    "index": pd.Index([col, "NOMINAL "+col])
+                    "kwargs": {},
+                    "index": "default"
                 }])))
                 if MULTIPROCESS:
                     updatequeue()
@@ -212,7 +221,7 @@ def tpaththreadfunction(tname, colinfo, q):
                             if t in ['sub', 'div', 'mul'] and len(cluster) != 2:
                                 continue
                             if len(cluster) > 1:
-                                new_colname = "%s:%s" % (t, ",".join(cluster))
+                                new_colname = "%s:(%s)" % (t, ",".join(cluster))
                                 cur_colinfo = deepcopy(pre_colinfo)
                                 cur_colinfo['col_names'] = pd.Index(list(cur_colinfo['col_names'])+[new_colname])
                                 cur_colinfo['num_col_names'] = pd.Index(list(cur_colinfo['num_col_names'])+[new_colname])

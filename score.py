@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.stats as st
 
 
 def getHist(data, label=None):
@@ -214,6 +215,65 @@ class dotGraph:
                 break
         return 100 * (1 - self.sorted_treeEdge[max_after_cut][1] / self.sorted_treeEdge[-1][1])
 
+def significance_outstanding1(data):
+    if data.ndim != 1:
+        return 0
+    if data.dtype == "object":
+        dataeleset = np.unique(data)
+        data = np.array([int(np.argwhere(dataeleset == i))+1 for i in data])
+    data = np.array(sorted(data))
+    # maxv = data[0]
+    # data = data / maxv
+    idx = np.array([np.power(i, 0.7) for i in range(1, len(data) + 1)])
+    k = np.sum((data - np.mean(data)) * (idx - np.mean(idx))) / np.sum((data - np.mean(data)) ** 2)
+    b = np.mean(data) - k * np.mean(idx)
+    data_pred = [k * i + b for i in idx]
+    ssr = np.sum((data_pred - np.mean(data)) ** 2)
+    sse = np.sum((data_pred - data) ** 2)
+
+    f = ssr / (sse / len(data) - 2)
+    return 100 * (1 - st.f.cdf(f, 1, len(data) - 2))
+
+
+def significance_correlation2(data):
+    if data.ndim != 2:
+        return 0
+    r = np.corrcoef(data[0], data[1])[0][1]
+    n = data[0].shape[0]
+    t = r * np.sqrt((n - 2) / (1 - r ** 2))
+    t = np.abs(t)
+    return 100 * (1 - 2 * (1 - st.t.cdf(t, n - 2)))
+
+
+def significance_correlation(data):
+    if data.ndim != 2:
+        return 0
+    if len(data) <= 2:
+        return significance_correlation2(data)
+    res = []
+    for i in range(len(data)):
+        for j in range(i + 1, len(data)):
+            res.append(significance_correlation2(data[[i, j]]))
+    return np.mean(res)
+
+def significance_linearcorrelation(data):
+    if data.ndim != 1:
+        return 0
+    if data.dtype == "object":
+        dataeleset = np.unique(data)
+        data = np.array([int(np.argwhere(dataeleset == i))+1 for i in data])
+    x = [i for i in range(1, len(data) + 1)]
+    k = np.sum((data - np.mean(data)) * (x- np.mean(x))) / np.sum((data - np.mean(data)) ** 2)
+    b = np.mean(data) - k * np.mean(x)
+    data_pred = [k * i + b for i in x]
+
+    ssr = np.sum((data_pred - np.mean(data)) ** 2)
+    sse = np.sum((data_pred - data) ** 2)
+
+    f = ssr / (sse / len(data) - 2)
+    return 100 * (1 - st.f.cdf(f, 1, len(data) - 2))
+
+
 if __name__ == "__main__":
     data = np.random.rand(100, 2)
     label = np.random.randint(2, size=100)
@@ -222,14 +282,22 @@ if __name__ == "__main__":
 
     # data = np.random.rand(200, 2)
     # data[49] = data[49] + 3
-    g = dotGraph(data)
-    g.minSpanTree()
-    print(g.outlying_value())
-    print(g.skew_value())
-    print(g.striated_value())
-    print(g.stringy_value())
-    print(g.straight_value())
-    print(g.spearman_value())
-    print(g.clumpy_value())
-    plt.scatter(data[:, 0], data[:, 1])
-    plt.show()
+    # g = dotGraph(data)
+    # g.minSpanTree()
+    # print(g.outlying_value())
+    # print(g.skew_value())
+    # print(g.striated_value())
+    # print(g.stringy_value())
+    # print(g.straight_value())
+    # print(g.spearman_value())
+    # print(g.clumpy_value())
+    # plt.scatter(data[:, 0], data[:, 1])
+    # plt.show()
+
+    data = np.array([10, 10, 10, 10, 100.2])
+
+    print(significance_outstanding1(data))
+    print(significance_correlation(np.array([data, [5, 16, 22, 53, 10]])))
+    print(significance_correlation(data))
+    print(significance_linearcorrelation(data))
+
