@@ -216,6 +216,16 @@ def w2v(words, stype="single"):
 def mean(l):
     return sum(l) / len(l) if len(l) > 0 else 0
 
+def Tstr2obj(s):
+    return eval(s.replace("Index", "pd.Index").replace("array", "np.array"))
+
+def suml(l):
+    if len(l) == 0:
+        return l
+    ret = l[0]
+    for i in range(1, len(l)):
+        ret += l[i]
+    return ret
 
 if __name__ == "__main__":
     d1 = pd.read_csv("./testdata/NetflixOriginals.csv", encoding="unicode_escape")

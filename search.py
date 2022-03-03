@@ -385,7 +385,7 @@ class searchobj:
                             if color.dtype == "int64":
                                 color = color.astype("float64")
 
-                        # g = score.dotGraph(xy.values)
+                        # g = score.sciGraph(xy.values)
                         # g.minSpanTree()
                         # print(g.outlying_value())
                         # print(g.skew_value())
@@ -737,6 +737,17 @@ class searchobj:
 
                         cs = {}
                         cat2legend = {}
+                        globalcs = {}
+                        g = score.sciGraph(xy.values)
+                        g.minSpanTree()
+                        globalcs["global_outlying"] = g.outlying_value()
+                        globalcs["global_skew"] = g.skew_value()
+                        globalcs["global_striated"] = g.striated_value()
+                        globalcs["global_stringy"] = g.stringy_value()
+                        globalcs["global_straight"] = g.straight_value()
+                        globalcs["global_spearman"] = g.spearman_value()
+                        globalcs["global_clumpy"] = g.clumpy_value()
+                        cs["global_quality"] = mean(list(globalcs.values()))
                         if cvisd["_chart_type"] == "cat_scatter":
                             if color.dtype == "float64":
                                 color = color.astype("int64")
@@ -754,14 +765,34 @@ class searchobj:
                                 cat2legend = {idx: lege for idx, lege in enumerate(categoriesset)}
                                 odata = idata.apply(lambda x: int(np.argwhere(categoriesset == x.values)), axis=1)
                                 color = odata
-                            if DEBUG:
-                                if len(np.unique(color[color >= 0].values)) > 1:
-                                    cs["CDM"] = score.CDM(xy.values, color.values)
-                                elif len(np.unique(color[color >= 0].values)) == 1:
-                                    cs["CDM"] = 0
-                                else:
-                                    # all data are outliers, may be processed like above (==1)
-                                    cs["CDM"] = 0
+
+                            # calculate CDM (clusters unoverlapping)
+                            if len(np.unique(color[color >= 0].values)) > 1:
+                                cs["CDM"] = score.CDM(xy.values, color.values)
+                            elif len(np.unique(color[color >= 0].values)) == 1:
+                                cs["CDM"] = 0
+                            else:
+                                # all data are outliers, may be processed like above (==1)
+                                cs["CDM"] = 0
+                            # calculate local quality for each cluster
+                            tmpdata = pd.concat([xy, color], axis=1)
+                            groups = tmpdata.groupby(tmpdata.columns[-1])
+                            localcss = []
+                            for colorcat, gxy in groups:
+                                if len(gxy) <= 2:
+                                    localcss.append(0.)
+                                    continue
+                                gxy = gxy[gxy.columns[:2]]
+                                localg = score.sciGraph(gxy.values)
+                                localg.minSpanTree()
+                                localcs = {}
+                                localcs["global_outlying"] = localg.outlying_value()
+                                localcs["global_non_skew"] = 100 - localg.skew_value()
+                                localcs["global_stringy"] = localg.stringy_value()
+                                localcs["global_straight"] = localg.straight_value()
+                                localcs["global_non_clumpy"] = 100 - localg.clumpy_value()
+                                localcss.append(mean(list(localcs.values())))
+                            cs["local_quality"] = mean(localcss)
                         elif cvisd["_chart_type"] == "num_scatter":
                             if color.dtype == "int64":
                                 color = color.astype("float64")
@@ -957,7 +988,7 @@ class searchobj:
                             dataeleset = np.unique(y.values)
                             yaxis = {i+1: e for i, e in enumerate(dataeleset)}
                             data = np.array([int(np.argwhere(dataeleset == i)) + 1 for i in y.values])
-                            y = pd.DataFrame(data, columns=y.columns)
+                            y = pd.DataFrame(data, columns=pd.Index(["Category by " + y_coret["name"].upper()]))
 
                         cs = {}
                         x = list(range(len(y)))
@@ -1069,7 +1100,7 @@ class searchobj:
                                 dataeleset = np.unique(y.values)
                                 yaxis = {i + 1: e for i, e in enumerate(dataeleset)}
                                 data = np.array([int(np.argwhere(dataeleset == i)) + 1 for i in y.values])
-                                y = pd.DataFrame(data, columns=y.columns)
+                                y = pd.DataFrame(data, columns=pd.Index(["Category by " + x_coret["name"].upper()]))
 
                             tmpxy = pd.concat([x, y], axis=1)
                             tmpxy = tmpxy.sort_values(by=tmpxy.columns[0])
@@ -1237,13 +1268,24 @@ class searchobj:
                 for i in range(0, len(ts)-1):
                     pid = SEPERATION.join(ts[:i+1])
                     cid = pid + SEPERATION + ts[i+1]
+                    ct = Tstr2obj(ts[i+1])
                     if cid not in node_ids:
                         node_ids.append(cid)
                         ret["nodes"].append({
                             "id": cid,
                             "node_type": "D",
                             "data": {
-                                "headers": self.tpathtree[cid].data
+                                "headers": self.tpathtree[cid].data,
+                                "T": ct["t"],
+                                "input": "include all " + ", ".join(ct["i"]) if ct["i_type"] == "like" else ct["i"],
+                                "output mode": ct["o_type"],
+                                "new columns": ct["index"] if isinstance(ct["index"], str) else list(ct["index"]),
+                                "args": list(ct["args"]),
+                                "parameters": ct["kwargs"]
+                            } if ct.get("t", None) is not None else {
+                                "headers": self.tpathtree[cid].data,
+                                "T": ct["name"],
+                                "parameters": ct["para"]
                             }
                         })
                         ret["edges"].append({
@@ -1288,7 +1330,7 @@ if __name__ == "__main__":
     so.postsearchinitialization()
     stree = so.postsearch()
     visdata = so.assemblevisdata(round=1)
-    so.showtest()
+    # so.showtest()
     # so.showtest(idx={"xy": [0, 1, 2], "color": [0, 1]})
     so.assembleandevaluevis()
     tree2front = so.assembleTtree()

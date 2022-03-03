@@ -17,7 +17,8 @@ from config import *
 from utils import *
 
 def tpaththreadfunction(tname, colinfo, q):
-    colinfo, rank_tp = ranking(colinfo)
+    if RANKINGON:
+        colinfo, rank_tp = ranking(colinfo)
     t = tlist[tname]
     tinput = t["input"]
     tinputdim = tinput["dim"] if isinstance(tinput, dict) else None

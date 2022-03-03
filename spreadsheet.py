@@ -202,6 +202,21 @@ class spreadsheet:
         if list(self.colinfo["num_col_names"]) not in self.colinfo["dim_match"]["clusters"]:
             self.colinfo["dim_match"]["clusters"].append(list(self.colinfo["num_col_names"]))
 
+
+        # potential unit measure matching
+        units = [colname.split("(")[-1][:-1] if colname.endswith(")") and colname.find("(")>=0 else "" for colname in self.columnnames]
+        unitsset = set(units)
+        try:
+            unitsset.remove("")
+        except:
+            pass
+        for u in unitsset:
+            clu = []
+            for i, cu in enumerate(units):
+                if cu == u:
+                    clu.append(self.columnnames[i])
+            self.colinfo["dim_match"]["clusters"].append(clu)
+
         # compute column names similarity
         self.colinfo["col_names_simi"]["vectors"] = utils.w2v(list(self.columnnames))
         self.colinfo["col_names_simi"]["cosine"] = pd.DataFrame(utils.distmat(self.colinfo["col_names_simi"]["vectors"],
@@ -227,8 +242,34 @@ class spreadsheet:
                 self.colinfo["col_names_simi"]["clusters"].append([])
             self.colinfo["col_names_simi"]["clusters"][cid].append(self.colinfo['col_names'][i])
 
+        # potential column names matching
+        subnameset = set(utils.suml([utils.sproc(colname) for colname in self.columnnames]))
+        for subname in subnameset:
+            if len(subname) < 2:
+                continue
+            clu = [colname for colname in self.columnnames if subname in colname]
+            if len(clu) >= 2:
+                self.colinfo["col_names_simi"]["clusters"].append(clu)
+
+        # remove duplications, nominal columns, and potential index columns
+        for i, cluster in enumerate(self.colinfo["col_names_simi"]["clusters"]):
+            for colname in cluster:
+                if self.colinfo["col_type"][colname]["type"] not in ["int", "real"] or colname in POTENTIALIDX:
+                    self.colinfo["col_names_simi"]["clusters"][i].remove(colname)
+        for i, cluster in enumerate(self.colinfo["dim_match"]["clusters"]):
+            for colname in cluster:
+                if self.colinfo["col_type"][colname]["type"] not in ["int", "real"] or colname in POTENTIALIDX:
+                    self.colinfo["dim_match"]["clusters"][i].remove(colname)
+        self.colinfo["col_names_simi"]["clusters"] = self.clearclusters(self.colinfo["col_names_simi"]["clusters"])
+        self.colinfo["dim_match"]["clusters"] = self.clearclusters(self.colinfo["dim_match"]["clusters"])
 
 
+    def clearclusters(self, ll):
+        ret = []
+        for l in ll:
+            if len(l) >= 2 and l not in ret:
+                ret.append(l)
+        return ret
 
 
 if __name__ == "__main__":

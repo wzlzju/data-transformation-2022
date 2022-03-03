@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as st
+from scipy.sparse import csr_matrix
+import scipy.sparse.csgraph as csgraph
+import copy
 
 
 def getHist(data, label=None):
@@ -44,6 +47,130 @@ def CDM(data, label):
 
     result = result / data.shape[0] / (len(hist_by_class) - 1)
     return result * 100
+
+class sciGraph:
+    def __init__(self, dots):
+        self.dot_num = dots.shape[0]
+        self.dots = dots
+        self.cache = {}
+        self.adjmax = csr_matrix([[self.dist(i, j) for j in range(self.dot_num)]for i in range(self.dot_num)])
+
+    def cosineDist(self, vec, a, b, norma, normb):
+        v1 = self.dots[a] - self.dots[vec]
+        v2 = self.dots[b] - self.dots[vec]
+        res = np.sum(v1 * v2) / (norma * normb)
+        return res
+
+    def dist(self, a, b):
+        if (min(a, b), max(a, b)) in self.cache.keys():
+            return self.cache[(min(a, b), max(a, b))]
+        else:
+            self.cache[(min(a, b), max(a, b))] = np.sqrt(np.sum((self.dots[a] - self.dots[b]) ** 2))
+            return self.cache[(min(a, b), max(a, b))]
+
+    def minSpanTree(self):
+        self.treeAdjmax = csgraph.minimum_spanning_tree(self.adjmax)
+        self.vertex = np.array(self.treeAdjmax.nonzero())
+
+        # percentile of the MST edge lengths
+        tmp = self.treeAdjmax.toarray()[self.treeAdjmax.toarray() != 0]
+        self.q75 = np.percentile(tmp, 75)
+        self.q25 = np.percentile(tmp, 25)
+        self.q90 = np.percentile(tmp, 90)
+        self.q50 = np.percentile(tmp, 50)
+        self.q10 = np.percentile(tmp, 10)
+        # print(self.q90, self.q10, self.q50, self.q75, self.q25)
+
+    def diameter(self):
+        furthest = csgraph.breadth_first_order(self.treeAdjmax, 0, directed=False, return_predecessors=False)[-1]
+        dists = csgraph.shortest_path(self.treeAdjmax, return_predecessors=False, directed=False, indices=furthest)
+        furfurthest = dists.argmax()
+        diameter = dists[furfurthest]
+        return diameter, furthest, furfurthest
+
+    def stringy_value(self):
+        diameter, _, _ = self.diameter()
+        length = np.sum(self.treeAdjmax.toarray())
+
+        return 100 * diameter / length
+
+    def straight_value(self):
+        diameter, a, b = self.diameter()
+        dist = self.dist(a, b)
+        return 100 * dist / diameter
+
+    def outlying_value(self):
+        w = self.q75 + 1.5 * (self.q75 - self.q25)
+        cut_edges_length = 0
+        tree_edges_length = 0
+        for i in range(len(self.vertex[0])):
+            tree_edges_length += self.treeAdjmax[self.vertex[0][i], self.vertex[1][i]]
+            if self.treeAdjmax[self.vertex[0][i], self.vertex[1][i]] > w:
+                 if np.sum(self.vertex == self.vertex[0][i]) == 1 or np.sum(self.vertex == self.vertex[1][i]) == 1:
+                     cut_edges_length += self.treeAdjmax[self.vertex[0][i], self.vertex[1][i]]
+
+        return 100 * (tree_edges_length - cut_edges_length) / tree_edges_length
+
+    def skew_value(self):
+        return 100 * (self.q90 - self.q50) / (self.q90 - self.q10)
+
+    def striated_value(self):
+        angles = {}
+        for i in range(self.dot_num):
+            if np.sum(self.vertex == i) == 2:
+                angles[i] = []
+        for j in range(len(self.vertex[0])):
+            if self.vertex[0][j] in angles.keys():
+                angles[self.vertex[0][j]].append(
+                    (self.vertex[1][j], self.treeAdjmax[self.vertex[0][j], self.vertex[1][j]]))
+            if self.vertex[1][j] in angles.keys():
+                angles[self.vertex[1][j]].append(
+                    (self.vertex[0][j], self.treeAdjmax[self.vertex[0][j], self.vertex[1][j]]))
+
+        res = 0
+        for ag in angles.items():
+            res += np.abs(self.cosineDist(ag[0], ag[1][0][0], ag[1][1][0], ag[1][0][1], ag[1][1][1]))
+        res = res / len(angles)
+        return 100 * res
+
+    def spearman_value(self):
+        import scipy.stats as stats
+        r, _ = stats.spearmanr(self.dots)
+        return 100 * abs(r)
+
+    def clumpy_value(self):
+        w = 0 * self.q50
+        tmp_cut = -1
+        tmpTreeAdjmax = copy.deepcopy(self.treeAdjmax).toarray()
+        tmpTreeAdjmaxCut = np.zeros_like(tmpTreeAdjmax)
+        for i in range(len(self.treeAdjmax.nonzero()[0])):
+            idx = tmpTreeAdjmax.argmax()
+            vi = idx // self.dot_num
+            vj = idx % self.dot_num
+            if tmpTreeAdjmax[vi][vj] > w:
+                tmp_cut = tmpTreeAdjmax[vi][vj]
+                tmpTreeAdjmax[vi][vj] = 0
+                tmpTreeAdjmax[vj][vi] = 0
+
+                _, labels = csgraph.connected_components(csgraph=csr_matrix(tmpTreeAdjmax + tmpTreeAdjmaxCut),
+                                                         directed=False)
+                labels_cnt = np.unique(labels)
+                for j in range(np.max(labels) + 1):
+                    labels_cnt[j] = np.sum(labels == j)
+                # print(labels)
+                if (max(0.05 * self.dot_num, 1) < labels_cnt).all() and (
+                        labels_cnt < min(self.dot_num - 1, 0.95 * self.dot_num)).all():
+                    tmpTreeAdjmaxCut[vi][vj] = 1
+                    tmpTreeAdjmaxCut[vj][vi] = 1
+                else:
+                    break
+            else:
+                break
+        if tmp_cut == -1:
+            return 0
+        else:
+            return 100 * (1 - (tmp_cut - np.min(self.treeAdjmax.toarray())) /
+                          (np.max(self.treeAdjmax.toarray() - np.min(self.treeAdjmax.toarray()))))
 
 class dotGraph:
     def __init__(self, dots, cache=True):
@@ -207,7 +334,7 @@ class dotGraph:
             if e[1] > w:
                 _, _, subset_dots = self.bfs(e[0][0], mark_dot=[e[0][1]], searched_dot_count=True)
                 alpha = 0.05
-                if alpha * self.dot_num < subset_dots < (1-alpha) * self.dot_num:
+                if max(alpha * self.dot_num, 1) < subset_dots < min((1-alpha) * self.dot_num, self.dot_num-1):
                     max_after_cut = -i - 1
                 else:
                     break
@@ -275,29 +402,30 @@ def significance_linearcorrelation(data):
 
 
 if __name__ == "__main__":
-    data = np.random.rand(100, 2)
-    label = np.random.randint(2, size=100)
-    for i in range(100):
-        data[i] = data[i] + 1.1 * label[i]
+    data = np.random.rand(300, 2)
+    label = np.random.randint(2, size=300)
+    for i in range(300):
+        data[i] = data[i] + 3 * label[i]
 
     # data = np.random.rand(200, 2)
     # data[49] = data[49] + 3
-    # g = dotGraph(data)
-    # g.minSpanTree()
-    # print(g.outlying_value())
-    # print(g.skew_value())
-    # print(g.striated_value())
-    # print(g.stringy_value())
-    # print(g.straight_value())
-    # print(g.spearman_value())
-    # print(g.clumpy_value())
+    # data = np.load("testdata/test1.npy")
+    g = sciGraph(data)
+    g.minSpanTree()
+    print(g.outlying_value())
+    print(g.skew_value())
+    print(g.striated_value())
+    print(g.stringy_value())
+    print(g.straight_value())
+    print(g.spearman_value())
+    print(g.clumpy_value())
     # plt.scatter(data[:, 0], data[:, 1])
     # plt.show()
 
-    data = np.array([10, 10, 10, 10, 100.2])
-
-    print(significance_outstanding1(data))
-    print(significance_correlation(np.array([data, [5, 16, 22, 53, 10]])))
-    print(significance_correlation(data))
-    print(significance_linearcorrelation(data))
+    # data = np.array([10, 10, 10, 10, 100.2])
+    #
+    # print(significance_outstanding1(data))
+    # print(significance_correlation(np.array([data, [5, 16, 22, 53, 10]])))
+    # print(significance_correlation(data))
+    # print(significance_linearcorrelation(data))
 

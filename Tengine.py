@@ -111,8 +111,7 @@ def transform(data, coret=None, tpath=None, tpathtree=None):
         cid = pid + SEPERATION + str(coret)
         if tpathtree is not None:
             if tpathtree[cid].data is None:
-                tpathtree[cid].data = list(ndata.columns) if isinstance(ndata, pd.DataFrame) else [0]
-
+                tpathtree[cid].data = list(ndata.columns) if isinstance(ndata, pd.DataFrame) else ([ndata.name] if ndata.name is not None else [0])
     if tpathtree is not None:
         return ndata, tpathtree
     else:
@@ -147,19 +146,19 @@ def Tlda(data, para):
     ndata = data.select_dtypes(include=["int", "float"])
     res = plda(ndata, **para)   # numpy result
 
-    return pd.Series(res)
+    return pd.Series(res, name="Category by LDA")
 
 def Tdbscan(data, para):
     ndata = data.select_dtypes(include=["int", "float"])
     res = pdbscan(ndata, **para)   # numpy result
 
-    return pd.Series(res)
+    return pd.Series(res, name="Category by DBSCAN")
 
 def Tkmeans(data, para):
     ndata = data.select_dtypes(include=["int", "float"])
     res = pkmeans(ndata, **para)   # numpy result
 
-    return pd.Series(res).astype("int64")
+    return pd.Series(res, name="Category by KMeans").astype("int64")
 
 def Tnull(data, para):
     ndata = data

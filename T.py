@@ -9,7 +9,9 @@ tlist = {
             "dim": 2,
             "type": "num"
         },
-        "para": {}
+        "para": {
+            "n_components": 2
+        }
     },
     "tsne": {
         "name": "tsne",
@@ -21,7 +23,9 @@ tlist = {
             "dim": 2,
             "type": "num"
         },
-        "para": {}
+        "para": {
+            "n_components": 2
+        }
     },
     "mds": {
         "name": "mds",
@@ -33,7 +37,9 @@ tlist = {
             "dim": 2,
             "type": "num"
         },
-        "para": {}
+        "para": {
+            "n_components": 2
+        }
     },
     "umap": {
         "name": "umap",
@@ -45,7 +51,9 @@ tlist = {
             "dim": 2,
             "type": "num"
         },
-        "para": {}
+        "para": {
+            "n_components": 2
+        }
     },
     "lida": {
         "name": "lida",
@@ -60,7 +68,9 @@ tlist = {
             "dim": 2,
             "type": "num"
         },
-        "para": {}
+        "para": {
+            "n_components": 2
+        }
     },
     "lda": {
         "name": "lda",
@@ -72,7 +82,9 @@ tlist = {
             "dim": 1,
             "type": "cat"
         },
-        "para": {}
+        "para": {
+            "n_components": 4
+        }
     },
     "dbscan": {
         "name": "dbscan",
@@ -84,7 +96,10 @@ tlist = {
             "dim": 1,
             "type": "cat"
         },
-        "para": {}
+        "para": {
+            "eps": 0.25,
+            "min_samples": 5
+        }
     },
     "kmeans": {
         "name": "kmeans",
@@ -96,7 +111,9 @@ tlist = {
             "dim": 1,
             "type": "cat"
         },
-        "para": {}
+        "para": {
+            "n_components": 3
+        }
     },
     "null_num1": {
         "name": "null_num1",
@@ -150,8 +167,8 @@ tlist = {
 
 numtl = ["pca", "tsne", "mds", "umap", "null_num", "null_num1"]
 cattl = ["dbscan", "kmeans", "lda", "null_nom1"]
-numtl = ["pca"]
-cattl = ["null_nom1"]
+numtl = ["pca", "null_num"]
+cattl = ["kmeans", "lda", "null_nom1"]
 
 class tpath(list):
     def __lt__(self, other):
