@@ -859,6 +859,7 @@ class searchobj:
                         print("error: unexpected y format. excepted pandas.DataFrame, but got",
                               type(x), "in <class searchobj><func showtest><branch line>")
                         raise Exception("error unexpected color format")
+                    x = x.astype("str")
 
                     if DEBUG:
                         print("x:")
@@ -897,7 +898,7 @@ class searchobj:
                             y = y[tarcol]
 
                         tmpxy = pd.concat([x, y], axis=1)
-                        groups = tmpxy.groupby(x.columns[0])
+                        groups = tmpxy.groupby(tmpxy.columns[0])
                         y = None
                         for xcat, gy in groups:
                             if cvisd["_chart_type"].startswith("sum"):
@@ -934,8 +935,8 @@ class searchobj:
 
                         self.visbuffer["bar"].append((mean(cs.values()), {
                             "pnodes": {
-                                "y": "r" + SEPERATION + SEPERATION.join([str(t) for t in y_tpath]) + SEPERATION + str(
-                                    y_coret)
+                                "x": "r" + SEPERATION + SEPERATION.join([str(t) for t in x_tpath]) + SEPERATION + str(x_coret),
+                                "y": "r" + SEPERATION + SEPERATION.join([str(t) for t in y_tpath]) + SEPERATION + str(y_coret)
                             },
                             "chart_type": "bar",
                             "data": [{
