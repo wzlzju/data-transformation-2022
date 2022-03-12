@@ -1,5 +1,5 @@
 MAXSOURCEDATAROWS = 400
-NOMINALSTD = 0.1
+NOMINALSTD = 0.05
 OUTLIERCOLOR = (0.5, 0.5, 0.5)
 POTENTIALIDX = ["idx", "index", "epoch", "no", "no."]
 

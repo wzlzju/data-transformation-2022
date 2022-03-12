@@ -173,15 +173,22 @@ class spreadsheet:
                 "iskey": True
             }
 
+        self.colinfo["dim_match"]["clusters"] = []
+        self.colinfo["col_names_simi"]["clusters"] = []
+        self.colinfo["col_names_simi"]["vectors"] = []
+        self.colinfo["col_names_simi"]["cosine"] = []
+        if len(self.colinfo["num_col_names"]) == 0:
+            return
+
         # compute columns distribution distance matrix
         self.colinfo["dist_mat"]["wasserstein"] = utils.distmat(self.num_data,
                                                                 self.num_data,
                                                                 metric="wasserstein",
                                                                 type="col")
-        self.colinfo["dist_mat"]["jensenshannon"] = utils.distmat(self.num_data,
-                                                                self.num_data,
-                                                                metric="jensenshannon",
-                                                                type="col")
+        # self.colinfo["dist_mat"]["jensenshannon"] = utils.distmat(self.num_data,
+        #                                                         self.num_data,
+        #                                                         metric="jensenshannon",
+        #                                                         type="col")
 
         # pre-calculate dimension matching column clustering
         clustering_res = DBSCAN(eps=1, # need to be tuned
@@ -192,7 +199,7 @@ class spreadsheet:
                                 leaf_size=30,
                                 p=None,
                                 n_jobs=1).fit_predict(pd.DataFrame(self.num_data.values.T, index=self.num_data.columns, columns=self.num_data.index))
-        self.colinfo["dim_match"]["clusters"] = []
+
         for i, cid in enumerate(clustering_res):
             if cid < 0:
                 continue
@@ -234,7 +241,7 @@ class spreadsheet:
                leaf_size=30,
                p=None,
                n_jobs=1).fit_predict(self.colinfo["col_names_simi"]["vectors"])
-        self.colinfo["col_names_simi"]["clusters"] = []
+
         for i, cid in enumerate(clustering_res):
             if cid < 0:
                 continue

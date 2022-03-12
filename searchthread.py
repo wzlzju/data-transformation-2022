@@ -109,6 +109,22 @@ def tpaththreadfunction(tname, colinfo, q):
                 }])))
                 if MULTIPROCESS:
                     updatequeue()
+    elif tname == "null_nom":
+        noml = []
+        for col in colnames:
+            if coltype[col]["type"] == "nominal" and not coltype[col]["iskey"]:
+                noml.append(col)
+        pool.append((0, tpath([{
+            "t": "select",
+            "i_type": "==",
+            "i": noml,
+            "o_type": "new_table",
+            "args": (),
+            "kwargs": {},
+            "index": "default"
+        }])))
+        if MULTIPROCESS:
+            updatequeue()
     elif tname == "null_num1":
         for col in colnames:
             if coltype[col]["type"] in ["real", "int"] and not coltype[col]["iskey"]:

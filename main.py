@@ -12,6 +12,10 @@ from search import searchobj
 
 from config import *
 
+import V
+import T
+import score
+
 
 app = Flask(__name__)
 app.debug = DEBUG
@@ -39,7 +43,7 @@ def csv_in():
     header = data.get("headers", "default")
     table = data.get("body", "default")
     print("headers", type(header), header)
-    print("body", type(table), table)
+    # print("body", type(table), table)
     global sheet, sobj, stree
     sheet = spreadsheet(dataframe=pd.DataFrame(table, columns=pd.Index(header)), encoding="unicode_escape", keep_default_na=False)
     ret = {
@@ -55,10 +59,10 @@ def csv_in():
         content = []
         content.append(colname) # attribute
         content.append(sheet.colinfo["col_type"][colname]["type"])  # type
-        content.append(str(sheet.colinfo["col_type"][colname]["domain"]))    # domain
-        content.append(sheet.colinfo["col_type"][colname].get("max", ""))   # max
-        content.append(sheet.colinfo["col_type"][colname].get("min", ""))   # min
-        content.append("T" if sheet.colinfo["col_type"][colname]["iskey"] else "")  # iskey
+        content.append(str(sheet.colinfo["col_type"][colname].get("domain", "")))    # domain
+        content.append(str(sheet.colinfo["col_type"][colname].get("max", "")))   # max
+        content.append(str(sheet.colinfo["col_type"][colname].get("min", "")))   # min
+        content.append("T" if sheet.colinfo["col_type"][colname].get("iskey", False) else "")  # iskey
         content.append(", ".join([str(i) for i in sheet.data[colname].values]))
         ret["columns"]["body"].append(content)
 
@@ -70,9 +74,16 @@ def csv_in():
 
 @app.route('/vis/search', methods=['POST'])
 def search_begin():
+    datastr = request.get_data().decode("utf-8")
+    data = json.loads(datastr)
     global sheet, sobj, stree, visdata
-    print(sheet.data)
+    # print(sheet.data)
     sobj = searchobj(dataobj=sheet)
+    sobj.configuration["vlist"] = data.get("vlist", V.vlist.keys())
+    sobj.configuration["tlist"] = data.get("tlist", T.tlist.keys())
+    sobj.configuration["slist"] = data.get("slist", score.slist)
+    sobj.dataobj.colinfo["dim_match"]["clusters"] = data.get("dim_clusters", [])
+    sobj.dataobj.colinfo["col_names_simi"]["clusters"] = data.get("sem_clusters", [])
     sobj.presearch()
     sobj.postsearchinitialization()
     stree = sobj.postsearch()

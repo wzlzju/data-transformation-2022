@@ -105,7 +105,7 @@ vlist = {
             "y": {
                 "name": "y",
                 "dim": None,
-                "type": "num"
+                "type": None
             }
         }
     }

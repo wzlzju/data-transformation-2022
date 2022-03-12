@@ -31,6 +31,7 @@ def transform(data, coret=None, tpath=None, tpathtree=None):
         "kmeans": Tkmeans,
 
         "null_nom1": Tnull,
+        "null_nom": Tnull,
         "null_num1": Tnull,
         "null_num": Tnull,
 

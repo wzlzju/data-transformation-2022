@@ -4,7 +4,28 @@ import scipy.stats as st
 from scipy.sparse import csr_matrix
 import scipy.sparse.csgraph as csgraph
 import copy
+import functools
 
+
+slist = {
+    "sca_cdm": True,
+    "sca_localgoodness": True,
+    "sca_outlying": True,
+    "sca_convex": True,
+    "sca_skinny": True,
+    "sca_stringy": True,
+    "sca_straight": True,
+    "sca_monotonic": True,
+    "sca_skewed": True,
+    "sca_clumpy": True,
+    "sca_striated": True,
+    "lin_outstanding1": True,
+    "lin_correlation": True,
+    "lin_linearness": True,
+    "sta_dispersion": True,
+    "sta_skew": True,
+    "sta_heavytail": True,
+}
 
 def getHist(data, label=None):
     # data: [idx, 2]
@@ -49,11 +70,23 @@ def CDM(data, label):
     return result * 100
 
 class sciGraph:
-    def __init__(self, dots):
-        self.dot_num = dots.shape[0]
-        self.dots = dots
+    def __init__(self, dots, dotnumlimit=10):
+        self.dots = self.remove_duplication(dots)
+        self.dot_num = self.dots.shape[0]
+        self.inf_dot_num = dotnumlimit
+        self.eps = 1e-6
         self.cache = {}
-        self.adjmax = csr_matrix([[self.dist(i, j) for j in range(self.dot_num)]for i in range(self.dot_num)])
+        self.adjmax = csr_matrix([[self.dist(i, j) for j in range(self.dot_num)] for i in range(self.dot_num)])
+
+    def remove_duplication(self, dots):
+        tmp_dots = [(dots[i][0], dots[i][1]) for i in range(dots.shape[0])]
+        cmp_func = lambda x, y: (x[0] - y[0]) if (x[0] != y[0]) else (x[1] - y[1])
+        tmp_dots = sorted(tmp_dots, key=functools.cmp_to_key(cmp_func))
+        res_dots = [tmp_dots[0]]
+        for i in range(1, dots.shape[0]):
+            if cmp_func(tmp_dots[i - 1], tmp_dots[i]) != 0:
+                res_dots.append(tmp_dots[i])
+        return np.array(res_dots)
 
     def cosineDist(self, vec, a, b, norma, normb):
         v1 = self.dots[a] - self.dots[vec]
@@ -69,6 +102,8 @@ class sciGraph:
             return self.cache[(min(a, b), max(a, b))]
 
     def minSpanTree(self):
+        if self.dot_num < self.inf_dot_num:
+            return 0
         self.treeAdjmax = csgraph.minimum_spanning_tree(self.adjmax)
         self.vertex = np.array(self.treeAdjmax.nonzero())
 
@@ -89,32 +124,42 @@ class sciGraph:
         return diameter, furthest, furfurthest
 
     def stringy_value(self):
+        if self.dot_num < self.inf_dot_num:
+            return 0
         diameter, _, _ = self.diameter()
         length = np.sum(self.treeAdjmax.toarray())
 
         return 100 * diameter / length
 
     def straight_value(self):
+        if self.dot_num < self.inf_dot_num:
+            return 0
         diameter, a, b = self.diameter()
         dist = self.dist(a, b)
         return 100 * dist / diameter
 
     def outlying_value(self):
+        if self.dot_num < self.inf_dot_num:
+            return 0
         w = self.q75 + 1.5 * (self.q75 - self.q25)
         cut_edges_length = 0
         tree_edges_length = 0
         for i in range(len(self.vertex[0])):
             tree_edges_length += self.treeAdjmax[self.vertex[0][i], self.vertex[1][i]]
             if self.treeAdjmax[self.vertex[0][i], self.vertex[1][i]] > w:
-                 if np.sum(self.vertex == self.vertex[0][i]) == 1 or np.sum(self.vertex == self.vertex[1][i]) == 1:
-                     cut_edges_length += self.treeAdjmax[self.vertex[0][i], self.vertex[1][i]]
+                if np.sum(self.vertex == self.vertex[0][i]) == 1 or np.sum(self.vertex == self.vertex[1][i]) == 1:
+                    cut_edges_length += self.treeAdjmax[self.vertex[0][i], self.vertex[1][i]]
 
         return 100 * (tree_edges_length - cut_edges_length) / tree_edges_length
 
     def skew_value(self):
-        return 100 * (self.q90 - self.q50) / (self.q90 - self.q10)
+        if self.dot_num < self.inf_dot_num:
+            return 0
+        return 100 * (self.q90 - self.q50 + self.eps) / (self.q90 - self.q10 + self.eps)
 
     def striated_value(self):
+        if self.dot_num < self.inf_dot_num:
+            return 0
         angles = {}
         for i in range(self.dot_num):
             if np.sum(self.vertex == i) == 2:
@@ -134,11 +179,15 @@ class sciGraph:
         return 100 * res
 
     def spearman_value(self):
+        if self.dot_num < self.inf_dot_num:
+            return 0
         import scipy.stats as stats
         r, _ = stats.spearmanr(self.dots)
         return 100 * abs(r)
 
     def clumpy_value(self):
+        if self.dot_num < self.inf_dot_num:
+            return 0
         w = 0 * self.q50
         tmp_cut = -1
         tmpTreeAdjmax = copy.deepcopy(self.treeAdjmax).toarray()
@@ -169,8 +218,8 @@ class sciGraph:
         if tmp_cut == -1:
             return 0
         else:
-            return 100 * (1 - (tmp_cut - np.min(self.treeAdjmax.toarray())) /
-                          (np.max(self.treeAdjmax.toarray() - np.min(self.treeAdjmax.toarray()))))
+            return 100 * (1 - (self.eps + tmp_cut - np.min(self.treeAdjmax.toarray())) /
+                          (np.max(self.eps + self.treeAdjmax.toarray() - np.min(self.treeAdjmax.toarray()))))
 
 class dotGraph:
     def __init__(self, dots, cache=True):
@@ -400,6 +449,20 @@ def significance_linearcorrelation(data):
     f = ssr / (sse / len(data) - 2)
     return 100 * (1 - st.f.cdf(f, 1, len(data) - 2))
 
+def dispersion_score(data):
+    return np.var(data)
+
+def skew_score(data):
+    n = data.shape[0]
+    miu = np.mean(data)
+    sigma = np.std(data)
+    return np.sum((data - miu) ** 3) / (n * sigma ** 3)
+
+def heavyTail_score(data):
+    n = data.shape[0]
+    miu = np.mean(data)
+    sigma = np.std(data)
+    return np.sum((data - miu) ** 4) / (n * sigma ** 4)
 
 if __name__ == "__main__":
     data = np.random.rand(300, 2)

@@ -35,10 +35,15 @@ class searchobj:
         self.tpathsets = {}
         self.stree = None
         self.tpathtree = None
+        self.configuration = {
+            "vlist": vlist.keys(),
+            "tlist": tlist.keys(),
+            "slist": score.slist
+        }
 
 
     def presearch(self):
-        for t in tlist.keys():
+        for t in self.configuration["tlist"]:
             if t not in numtl and t not in cattl:
                 continue
             self.tpathsets[t] = set()
@@ -55,7 +60,7 @@ class searchobj:
         if MULTIPROCESS:
             time.sleep(1)
         print("in presearch:")
-        for t in tlist.keys():
+        for t in self.configuration["tlist"]:
             if t not in numtl and t not in cattl:
                 continue
             print("\t", t)
@@ -80,7 +85,7 @@ class searchobj:
         self.postsearchround = 0
 
         # traverse Vs
-        for vidx, cvname in enumerate(list(vlist.keys())):
+        for vidx, cvname in enumerate(list(self.configuration["vlist"])):
             cv = vlist[cvname]
             vid = "v-%d" % vidx
             vnode = Node(tag=vid, identifier=vid, data={
@@ -97,9 +102,12 @@ class searchobj:
                     ctl = numtl
                 elif ctype == "cat":
                     ctl = cattl
+                elif ctype == "all" or ctype is None:
+                    ctl = numtl + cattl
                 else:
                     print("error: unexpected input type:", ctype, "of v:", cv)
                     raise Exception("error input type")
+                ctl = [i for i in ctl if i in self.configuration["tlist"]]
 
                 iid = "i-%d-%d" % (vidx, iidx)
                 inode = Node(tag=iid, identifier=iid, data={
@@ -142,7 +150,7 @@ class searchobj:
 
         # obtain current new tpaths for all core Ts
         ntpathsets = {}
-        for t in tlist.keys():
+        for t in self.configuration["tlist"]:
             if t not in numtl and t not in cattl:
                 continue
             ctpathset = set([pickle.dumps(ctpath) for cscore, ctpath in self.gettpath(t)])
@@ -155,7 +163,7 @@ class searchobj:
         # get basic T path tree for frontend
         self.tpathtree = Tree()
         self.tpathtree.create_node(tag="r", identifier="r", data=None)
-        for ctname in numtl+cattl:
+        for ctname in [i for i in numtl+cattl if i in self.configuration["tlist"]]:
             ntpathset = ntpathsets[ctname]
             for sctpath in ntpathset:
                 ctpath = pickle.loads(sctpath)
@@ -173,7 +181,7 @@ class searchobj:
 
 
         # traverse Vs
-        for vidx, cvname in enumerate(list(vlist.keys())):
+        for vidx, cvname in enumerate(list(self.configuration["vlist"])):
             cv = vlist[cvname]
 
             # traverse input channels of V
@@ -184,9 +192,12 @@ class searchobj:
                     ctl = numtl
                 elif ctype == "cat":
                     ctl = cattl
+                elif ctype == "all" or ctype is None:
+                    ctl = numtl + cattl
                 else:
                     print("error: unexpected input type:", ctype, "of v:", cv)
                     raise Exception("error input type")
+                ctl = [i for i in ctl if i in self.configuration["tlist"]]
 
                 # traverse corresponding T list
                 for tidx, ctname in enumerate(ctl):
@@ -484,7 +495,8 @@ class searchobj:
                         print("core T:", x_coret)
                         printTP(x_tpath, TAB="")
 
-                    x.columns = pd.Index(["Category by "+x_coret["name"].upper()])
+                    if not x_coret["name"].startswith("null"):
+                        x.columns = pd.Index(["Category by "+x_coret["name"].upper()])
 
                     for jj, y_obj in enumerate(ys):
                         y = y_obj["data"]
@@ -738,16 +750,37 @@ class searchobj:
                         cs = {}
                         cat2legend = {}
                         globalcs = {}
-                        g = score.sciGraph(xy.values)
-                        g.minSpanTree()
-                        globalcs["global_outlying"] = g.outlying_value()
-                        globalcs["global_skew"] = g.skew_value()
-                        globalcs["global_striated"] = g.striated_value()
-                        globalcs["global_stringy"] = g.stringy_value()
-                        globalcs["global_straight"] = g.straight_value()
-                        globalcs["global_spearman"] = g.spearman_value()
-                        globalcs["global_clumpy"] = g.clumpy_value()
+                        if self.configuration["slist"]["sca_outlying"] or \
+                            self.configuration["slist"]["sca_convex"] or \
+                            self.configuration["slist"]["sca_skinny"] or \
+                            self.configuration["slist"]["sca_stringy"] or \
+                            self.configuration["slist"]["sca_straight"] or \
+                            self.configuration["slist"]["sca_monotonic"] or \
+                            self.configuration["slist"]["sca_skewed"] or \
+                            self.configuration["slist"]["sca_clumpy"] or \
+                            self.configuration["slist"]["sca_striated"]:
+                            g = score.sciGraph(xy.values)
+                            g.minSpanTree()
+                        if self.configuration["slist"]["sca_outlying"]:
+                            globalcs["global_outlying"] = g.outlying_value()
+                        if self.configuration["slist"]["sca_convex"]:
+                            pass
+                        if self.configuration["slist"]["sca_skinny"]:
+                            pass
+                        if self.configuration["slist"]["sca_skewed"]:
+                            globalcs["global_skew"] = g.skew_value()
+                        if self.configuration["slist"]["sca_striated"]:
+                            globalcs["global_striated"] = g.striated_value()
+                        if self.configuration["slist"]["sca_stringy"]:
+                            globalcs["global_stringy"] = g.stringy_value()
+                        if self.configuration["slist"]["sca_straight"]:
+                            globalcs["global_straight"] = g.straight_value()
+                        if self.configuration["slist"]["sca_monotonic"]:
+                            globalcs["global_spearman"] = g.spearman_value()
+                        if self.configuration["slist"]["sca_clumpy"]:
+                            globalcs["global_clumpy"] = g.clumpy_value()
                         cs["global_quality"] = mean(list(globalcs.values()))
+
                         if cvisd["_chart_type"] == "cat_scatter":
                             if color.dtype == "float64":
                                 color = color.astype("int64")
@@ -767,39 +800,42 @@ class searchobj:
                                 color = odata
 
                             # calculate CDM (clusters unoverlapping)
-                            if len(np.unique(color[color >= 0].values)) > 1:
-                                cs["CDM"] = score.CDM(xy.values, color.values)
-                            elif len(np.unique(color[color >= 0].values)) == 1:
-                                cs["CDM"] = 0
-                            else:
-                                # all data are outliers, may be processed like above (==1)
-                                cs["CDM"] = 0
+                            if self.configuration["slist"]["sca_cdm"]:
+                                if len(np.unique(color[color >= 0].values)) > 1:
+                                    cs["CDM"] = score.CDM(xy.values, color.values)
+                                elif len(np.unique(color[color >= 0].values)) == 1:
+                                    cs["CDM"] = 0
+                                else:
+                                    # all data are outliers, may be processed like above (==1)
+                                    cs["CDM"] = 0
                             # calculate local quality for each cluster
                             tmpdata = pd.concat([xy, color], axis=1)
                             groups = tmpdata.groupby(tmpdata.columns[-1])
                             localcss = []
-                            for colorcat, gxy in groups:
-                                if len(gxy) <= 2:
-                                    localcss.append(0.)
-                                    continue
-                                gxy = gxy[gxy.columns[:2]]
-                                localg = score.sciGraph(gxy.values)
-                                localg.minSpanTree()
-                                localcs = {}
-                                localcs["global_outlying"] = localg.outlying_value()
-                                localcs["global_non_skew"] = 100 - localg.skew_value()
-                                localcs["global_stringy"] = localg.stringy_value()
-                                localcs["global_straight"] = localg.straight_value()
-                                localcs["global_non_clumpy"] = 100 - localg.clumpy_value()
-                                localcss.append(mean(list(localcs.values())))
-                            cs["local_quality"] = mean(localcss)
+                            if self.configuration["slist"]["sca_localgoodness"]:
+                                for colorcat, gxy in groups:
+                                    if len(gxy) <= 2:
+                                        localcss.append(0.)
+                                        continue
+                                    gxy = gxy[gxy.columns[:2]]
+                                    localg = score.sciGraph(gxy.values)
+                                    localg.minSpanTree()
+                                    localcs = {}
+                                    localcs["global_outlying"] = localg.outlying_value()
+                                    localcs["global_non_skew"] = 100 - localg.skew_value()
+                                    localcs["global_stringy"] = localg.stringy_value()
+                                    localcs["global_straight"] = localg.straight_value()
+                                    localcs["global_non_clumpy"] = 100 - localg.clumpy_value()
+                                    localcss.append(mean(list(localcs.values())))
+                                cs["local_quality"] = mean(localcss)
                         elif cvisd["_chart_type"] == "num_scatter":
                             if color.dtype == "int64":
                                 color = color.astype("float64")
                             color = color - min(color)
                             color = color / max(color)
                             tmpcolor = color.apply(lambda x: int(x*4) if x < 1 else 3)
-                            cs["CDM"] = score.CDM(xy.values, tmpcolor.values)
+                            if self.configuration["slist"]["sca_cdm"]:
+                                cs["CDM"] = score.CDM(xy.values, tmpcolor.values)
 
                         # color data -> color  --from palette
                         legend2color = {}
@@ -866,7 +902,8 @@ class searchobj:
                         print("core T:", x_coret)
                         printTP(x_tpath, TAB="")
 
-                    x.columns = pd.Index(["Category by " + x_coret["name"].upper()])
+                    if not x_coret["name"].startswith("null"):
+                        x.columns = pd.Index(["Category by " + x_coret["name"].upper()])
 
                     for jj, y_obj in enumerate(ys):
                         y = y_obj["data"]
@@ -898,7 +935,10 @@ class searchobj:
                             y = y[tarcol]
 
                         tmpxy = pd.concat([x, y], axis=1)
-                        groups = tmpxy.groupby(tmpxy.columns[0])
+                        try:
+                            groups = tmpxy.groupby(tmpxy.columns[0])
+                        except:
+                            continue
                         y = None
                         for xcat, gy in groups:
                             if cvisd["_chart_type"].startswith("sum"):
@@ -924,14 +964,17 @@ class searchobj:
 
                         cs = {}
 
-                        cs["outno1"] = mean([score.significance_outstanding1(y[col].values) for col in y.columns])
-                        cs["lincor"] = mean([score.significance_linearcorrelation(y[col].values) for col in y.columns])
-                        if len(y.columns) >= 2:
-                            corl = []
-                            for i in range(len(y.columns) - 1):
-                                for j in range(i + 1, len(y.columns)):
-                                    corl.append(score.significance_correlation(np.array([y[y.columns[i]].values, y[y.columns[j]].values])))
-                            cs["cor"] = mean(corl)
+                        if self.configuration["slist"]["lin_outstanding1"]:
+                            cs["outno1"] = mean([score.significance_outstanding1(y[col].values) for col in y.columns])
+                        if self.configuration["slist"]["lin_linearness"]:
+                            cs["lincor"] = mean([score.significance_linearcorrelation(y[col].values) for col in y.columns])
+                        if self.configuration["slist"]["lin_correlation"]:
+                            if len(y.columns) >= 2:
+                                corl = []
+                                for i in range(len(y.columns) - 1):
+                                    for j in range(i + 1, len(y.columns)):
+                                        corl.append(score.significance_correlation(np.array([y[y.columns[i]].values, y[y.columns[j]].values])))
+                                cs["cor"] = mean(corl)
 
                         self.visbuffer["bar"].append((mean(cs.values()), {
                             "pnodes": {
@@ -989,19 +1032,25 @@ class searchobj:
                             dataeleset = np.unique(y.values)
                             yaxis = {i+1: e for i, e in enumerate(dataeleset)}
                             data = np.array([int(np.argwhere(dataeleset == i)) + 1 for i in y.values])
-                            y = pd.DataFrame(data, columns=pd.Index(["Category by " + y_coret["name"].upper()]))
+                            if not y_coret["name"].startswith("null"):
+                                y = pd.DataFrame(data, columns=pd.Index(["Category by " + y_coret["name"].upper()]))
+                            else:
+                                y = pd.DataFrame(data)
 
                         cs = {}
                         x = list(range(len(y)))
 
-                        cs["outno1"] = mean([score.significance_outstanding1(y[col].values) for col in y.columns])
-                        cs["lincor"] = mean([score.significance_linearcorrelation(y[col].values) for col in y.columns])
-                        if len(y.columns) >= 2:
-                            corl = []
-                            for i in range(len(y.columns) - 1):
-                                for j in range(i + 1, len(y.columns)):
-                                    corl.append(score.significance_correlation(np.array([y[y.columns[i]].values, y[y.columns[j]].values])))
-                            cs["cor"] = mean(corl)
+                        if self.configuration["slist"]["lin_outstanding1"]:
+                            cs["outno1"] = mean([score.significance_outstanding1(y[col].values) for col in y.columns])
+                        if self.configuration["slist"]["lin_linearness"]:
+                            cs["lincor"] = mean([score.significance_linearcorrelation(y[col].values) for col in y.columns])
+                        if self.configuration["slist"]["lin_correlation"]:
+                            if len(y.columns) >= 2:
+                                corl = []
+                                for i in range(len(y.columns) - 1):
+                                    for j in range(i + 1, len(y.columns)):
+                                        corl.append(score.significance_correlation(np.array([y[y.columns[i]].values, y[y.columns[j]].values])))
+                                cs["cor"] = mean(corl)
 
                         if not catflag:
                             self.visbuffer["line"].append((mean(cs.values()), {
@@ -1101,25 +1150,30 @@ class searchobj:
                                 dataeleset = np.unique(y.values)
                                 yaxis = {i + 1: e for i, e in enumerate(dataeleset)}
                                 data = np.array([int(np.argwhere(dataeleset == i)) + 1 for i in y.values])
-                                y = pd.DataFrame(data, columns=pd.Index(["Category by " + x_coret["name"].upper()]))
+                                if not y_coret["name"].startswith("null"):
+                                    y = pd.DataFrame(data, columns=pd.Index(["Category by " + x_coret["name"].upper()]))
+                                else:
+                                    y = pd.DataFrame(data)
 
                             tmpxy = pd.concat([x, y], axis=1)
                             tmpxy = tmpxy.sort_values(by=tmpxy.columns[0])
-                            xrank = x[x.columns[0]].rank()
+                            xrank = x[x.columns[0]].rank(method="first")
                             tmpx = tmpxy[tmpxy.columns[0]]
                             tmpy = tmpxy[tmpxy.columns[1:]]
 
                             cs = {}
-
-                            cs["outno1"] = mean([score.significance_outstanding1(tmpy[col].values) for col in tmpy.columns])
-                            cs["lincor"] = mean([score.significance_linearcorrelation(tmpy[col].values) for col in tmpy.columns])
-                            if len(y.columns) >= 2:
-                                corl = []
-                                for i in range(len(tmpy.columns) - 1):
-                                    for j in range(i + 1, len(tmpy.columns)):
-                                        corl.append(score.significance_correlation(
-                                            np.array([tmpy[tmpy.columns[i]].values, tmpy[tmpy.columns[j]].values])))
-                                cs["cor"] = mean(corl)
+                            if self.configuration["slist"]["lin_outstanding1"]:
+                                cs["outno1"] = mean([score.significance_outstanding1(tmpy[col].values) for col in tmpy.columns])
+                            if self.configuration["slist"]["lin_linearness"]:
+                                cs["lincor"] = mean([score.significance_linearcorrelation(tmpy[col].values) for col in tmpy.columns])
+                            if self.configuration["slist"]["lin_correlation"]:
+                                if len(y.columns) >= 2:
+                                    corl = []
+                                    for i in range(len(tmpy.columns) - 1):
+                                        for j in range(i + 1, len(tmpy.columns)):
+                                            corl.append(score.significance_correlation(
+                                                np.array([tmpy[tmpy.columns[i]].values, tmpy[tmpy.columns[j]].values])))
+                                    cs["cor"] = mean(corl)
 
                             if not catflag:
                                 self.visbuffer["line"].append((mean(cs.values()), {
@@ -1320,11 +1374,11 @@ class searchobj:
 
 
 if __name__ == "__main__":
-    # sheet = spreadsheet("./testdata/ie19b.csv", encoding="unicode_escape", keep_default_na=False)
-    sheet = spreadsheet("./testdata/training2.csv", encoding="unicode_escape", keep_default_na=False)
+    sheet = spreadsheet("./testdata/ie19b.csv", encoding="unicode_escape", keep_default_na=False)
+    # sheet = spreadsheet("./testdata/training2.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/ZYF1/req0215/iris.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/NetflixOriginals.csv", encoding="unicode_escape", keep_default_na=False)
-    print(sheet.data)
+    #print(sheet.data)
 
     so = searchobj(dataobj=sheet)
     so.presearch()

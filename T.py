@@ -128,9 +128,9 @@ tlist = {
         "para": {}
     },
     "null_num": {
-        "name": "null_num1",
+        "name": "null_num",
         "input": {
-            "dim": 1,
+            "dim": None,
             "type": "num"
         },
         "output": {
@@ -151,6 +151,18 @@ tlist = {
         },
         "para": {}
     },
+    "null_nom": {
+        "name": "null_nom",
+        "input": {
+            "dim": None,
+            "type": "nominal"
+        },
+        "output": {
+            "dim": None,
+            "type": "cat"
+        },
+        "para": {}
+    },
     "test": {
         "name": "test",
         "input": {
@@ -166,9 +178,9 @@ tlist = {
 }
 
 numtl = ["pca", "tsne", "mds", "umap", "null_num", "null_num1"]
-cattl = ["dbscan", "kmeans", "lda", "null_nom1"]
-numtl = ["pca", "null_num"]
-cattl = ["kmeans", "lda", "null_nom1"]
+cattl = ["dbscan", "kmeans", "lda", "null_nom1", "null_nom"]
+# numtl = ["pca", "null_num"]
+# cattl = ["kmeans", "lda", "null_nom1", "null_nom"]
 
 class tpath(list):
     def __lt__(self, other):
@@ -179,7 +191,7 @@ basicTl = ['rank', 'aggr', 'sum', 'sub', 'mul', 'div']
 dmTl = ["pca", "tsne", "mds", "umap", "dbscan", "kmeans", "lda", "lida"]
 alignTl = ["pca", "tsne", "mds", "umap", "dbscan", "kmeans", "lda", "null_num", "null_num1"]
 
-threadsharing = [["pca", "tsne", "mds", "umap", "dbscan", "kmeans", "lda", "null_num"], ["lida"], ["null_nom1"], ["null_num1"], ["test"]]
+threadsharing = [["pca", "tsne", "mds", "umap", "dbscan", "kmeans", "lda", "null_num"], ["lida"], ["null_nom1"], ["null_num1"], ["null_nom"], ["test"]]
 def getRepT(tname):
     for ss in threadsharing:
         if tname in ss:
