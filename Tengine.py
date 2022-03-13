@@ -45,60 +45,7 @@ def transform(data, coret=None, tpath=None, tpathtree=None):
         for t in tpath:
             cid = pid + SEPERATION + str(t)
 
-            # process input
-            if t["i_type"] == "like":
-                idata = ndata.select_dtypes(include=t["i"])
-            elif t["i_type"] == "==":
-                idata = ndata[t["i"]]
-            else:
-                print("error: unexpected basic T input type:", t["i_type"], "in <func transform>")
-                raise Exception("error unexcepted T input type")
-
-            # process T
-            if t["t"] == "astype":
-                odata = idata.astype(*t["args"], **t["kwargs"])
-            elif t["t"] == "sum":
-                odata = idata.apply(lambda x: x.sum(), *t["args"], **t["kwargs"])
-            elif t["t"] == "mul":
-                odata = idata.apply(lambda x: x.product(), *t["args"], **t["kwargs"])
-            elif t["t"] == "select":
-                odata = idata
-            elif t["t"] == "rank":
-                odata = idata.rank(*t["args"], **t["kwargs"]).astype("int64")
-            elif t["t"] == "nominalize":
-                if isinstance(idata, pd.Series):
-                    idata = pd.DataFrame(idata)
-                categoriesset = np.unique(idata.values)
-                odata = idata.apply(lambda x: int(np.argwhere(categoriesset == x.values)), *t["args"], **t["kwargs"])
-                odata = pd.concat([idata, odata], axis=1)
-            else:
-                print("error: unexpected basic T:", t["t"], "in <func transform>")
-                raise Exception("error unexcepted T")
-
-            # process index
-            if isinstance(t["index"], str) and t["index"] == "default":
-                pass
-            else:
-                if isinstance(odata, pd.Series):
-                    odata = pd.DataFrame(odata)
-                odata.columns = t["index"]
-
-            # process output
-            if t["o_type"] == "new_table":
-                ndata = odata
-            elif t["o_type"] == "append":
-                ndata = pd.concat([ndata, odata], axis=1)
-            elif t["o_type"] == "replace":
-                ndata.drop(idata, axis=1)
-                ndata = pd.concat([ndata, odata], axis=1)
-            else:
-                print("error: unexpected basic T output type:", t["o_type"], "in <func transform>")
-                raise Exception("error unexcepted T output type")
-
-            # convert ndata into DataFrame
-            # guarantee the ndata is DataFrame before core T
-            if isinstance(ndata, pd.Series):
-                ndata = pd.DataFrame(ndata)
+            ndata = Tbasic(ndata, t)
 
             if tpathtree is not None:
                 if tpathtree[cid].data is None:
@@ -118,6 +65,70 @@ def transform(data, coret=None, tpath=None, tpathtree=None):
     else:
         return ndata
 
+
+def Tbasic(data, t):
+    ndata = data
+
+    # process input
+    if t["i_type"] == "like":
+        idata = ndata.select_dtypes(include=t["i"])
+    elif t["i_type"] == "==":
+        idata = ndata[t["i"]]
+    elif t["i_type"] == "all":
+        idata = ndata
+    elif t["i_type"] == "num":
+        idata = ndata.select_dtypes(include=["int", "float"])
+    else:
+        print("error: unexpected basic T input type:", t["i_type"], "in <func transform>")
+        raise Exception("error unexcepted T input type")
+
+    # process T
+    if t["t"] == "astype":
+        odata = idata.astype(*t["args"], **t["kwargs"])
+    elif t["t"] == "sum":
+        odata = idata.apply(lambda x: x.sum(), *t["args"], **t["kwargs"])
+    elif t["t"] == "mul":
+        odata = idata.apply(lambda x: x.product(), *t["args"], **t["kwargs"])
+    elif t["t"] == "select":
+        odata = idata
+    elif t["t"] == "rank":
+        odata = idata.rank(*t["args"], **t["kwargs"]).astype("int64")
+    elif t["t"] == "nominalize":
+        if isinstance(idata, pd.Series):
+            idata = pd.DataFrame(idata)
+        categoriesset = np.unique(idata.values)
+        odata = idata.apply(lambda x: int(np.argwhere(categoriesset == x.values)), *t["args"], **t["kwargs"])
+        odata = pd.concat([idata, odata], axis=1)
+    else:
+        print("error: unexpected basic T:", t["t"], "in <func transform>")
+        raise Exception("error unexcepted T")
+
+    # process index
+    if isinstance(t["index"], str) and t["index"] == "default":
+        pass
+    else:
+        if isinstance(odata, pd.Series):
+            odata = pd.DataFrame(odata)
+        odata.columns = t["index"]
+
+    # process output
+    if t["o_type"] == "new_table":
+        ndata = odata
+    elif t["o_type"] == "append":
+        ndata = pd.concat([ndata, odata], axis=1)
+    elif t["o_type"] == "replace":
+        ndata.drop(idata, axis=1)
+        ndata = pd.concat([ndata, odata], axis=1)
+    else:
+        print("error: unexpected basic T output type:", t["o_type"], "in <func transform>")
+        raise Exception("error unexcepted T output type")
+
+    # convert ndata into DataFrame
+    # guarantee the ndata is DataFrame before core T
+    if isinstance(ndata, pd.Series):
+        ndata = pd.DataFrame(ndata)
+
+    return ndata
 
 def Tpca(data, para):
     ndata = data.select_dtypes(include=["int", "float"])

@@ -14,7 +14,7 @@ from multiprocessing import Process, Pool, Queue
 from _queue import Empty
 
 from spreadsheet import spreadsheet
-from Tengine import transform, printTP
+from Tengine import transform, printTP, Tbasic
 from V import *
 from T import *
 from Tfunctions import *
@@ -1185,7 +1185,7 @@ class searchobj:
                                     },
                                     "chart_type": "line",
                                     "data": [{
-                                        "x": tmpx[i],
+                                        "x": int(tmpx[i]),
                                         "y": [float(tmpy[col][i]) for col in tmpy.columns],
                                         "text": str((self.dataobj.data[
                                             self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[int(np.argwhere(xrank.values==(i+1)))])
@@ -1204,7 +1204,7 @@ class searchobj:
                                     },
                                     "chart_type": "cat_line",
                                     "data": [{
-                                        "x": tmpx[i],
+                                        "x": int(tmpx[i]),
                                         "y": [int(tmpy[col][i]) for col in tmpy.columns],
                                         "text": str((self.dataobj.data[
                                             self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[
@@ -1290,7 +1290,7 @@ class searchobj:
             vlegend = vnode[1]["legend"]
             vxlabel = vnode[1]["xlabel"]
             vylabel = vnode[1]["ylabel"]
-            vyaxis =  vnode[1].get("yaxis", {})
+            vyaxis = vnode[1].get("yaxis", {})
             vid = vchart_type + "<VIS>" + (SEPERATION + SEPERATION).join(vpnodes.values())
             ret["nodes"].append({
                 "id": vid,
@@ -1362,7 +1362,65 @@ class searchobj:
                     "from": cid,
                     "to": vid
                 })
+        self.tree2front = ret
         return ret
+
+    def singletransformation(self, pid, t, **kwargs):
+        if pid is None or t is None:
+            return self.tree2front
+        nidl = pid.split(SEPERATION)
+        tp = [Tstr2obj(nidl[i]) for i in range(1, len(nidl))]
+        ndata = self.dataobj.data
+        for t in tp:
+            if tp.get("t", None) is not None:
+                ndata = Tbasic(ndata, t)
+            else:
+                ndata = transform(ndata, coret=t, tpath=None)
+        if t in dmTl:
+            ct = {
+                "name": t,
+                "input": tlist[t]["input"],
+                "output": tlist[t]["output"],
+                "para": kwargs if kwargs is not None and len(kwargs) > 0 else tlist[t]["para"]
+            }
+            cid = pid + SEPERATION + str(ct)
+            ndata = transform(ndata, coret=ct, tpath=None)
+            data = {
+                "headers": list(ndata.columns) if isinstance(ndata, pd.DataFrame) else ([ndata.name] if ndata.name is not None else [0]),
+                "T": ct["name"],
+                "parameters": ct["para"]
+            }
+        else:
+            ct = {
+                "t": t,
+                "i_type": kwargs.get("i_type", "num"),
+                "i": kwargs.get("i", []),
+                "o_type": kwargs.get("o_type", "new_table"),
+                "args": kwargs.get("args", ()),
+                "kwargs": kwargs.get("kwargs", {}),
+                "index": "default"
+            }
+            cid = pid + SEPERATION + str(ct)
+            ndata = Tbasic(ndata, ct)
+            data = {
+                "headers": list(ndata.columns) if isinstance(ndata, pd.DataFrame) else ([ndata.name] if ndata.name is not None else [0]),
+                "T": ct["t"],
+                "input": "include all " + ", ".join(ct["i"]) if ct["i_type"] == "like" else ct["i"],
+                "output mode": ct["o_type"],
+                "new columns": ct["index"] if isinstance(ct["index"], str) else list(ct["index"]),
+                "args": list(ct["args"]),
+                "parameters": ct["kwargs"]
+            }
+        self.tree2front["nodes"].append({
+            "id": cid,
+            "node_type": "D",
+            "data": data
+        })
+        self.tree2front["edges"].append({
+            "from": pid,
+            "to": cid
+        })
+        return self.tree2front
 
 
     def deconstruct(self):

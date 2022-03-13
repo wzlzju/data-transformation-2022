@@ -93,6 +93,19 @@ def search_begin():
     # sobj.deconstruct()
     return json.dumps(ret)
 
+@app.route('/vis/addT', methods=['POST'])
+def addT():
+    datastr = request.get_data().decode("utf-8")
+    data = json.loads(datastr)
+    global sheet, sobj, stree, visdata
+    # print(sheet.data)
+    sobj = searchobj(dataobj=sheet)
+    pid = data.get("pid", None)
+    t = data.get("t", None)
+    para = data.get("para", {})
+    ret = sobj.singletransformation(pid, t, **para)
+    return json.dumps(ret)
+
 
 if __name__ == '__main__':
     app.run(host=HOST, port=PORT)
