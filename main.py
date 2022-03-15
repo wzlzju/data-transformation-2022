@@ -79,11 +79,23 @@ def search_begin():
     global sheet, sobj, stree, visdata
     # print(sheet.data)
     sobj = searchobj(dataobj=sheet)
-    sobj.configuration["vlist"] = data.get("vlist", V.vlist.keys())
-    sobj.configuration["tlist"] = data.get("tlist", T.tlist.keys())
+    vl = data.get("vlist", ["scatter", "line", "bar"])
+    tvl = []
+    if "scatter" in vl:
+        tvl += ["num_scatter", "cat_scatter"]
+    if "line" in vl:
+        tvl += ["ord_line", "ord_cat_line", "rel_line", "rel_cat_line"]
+    if "bar" in vl:
+        tvl += ["sum_bar", "count_bar"]
+    ttl = data.get("tlist", T.tlist.keys())
+    for tt in ["null_num", "null_num1", "null_nom", "null_nom1"]:
+        if tt not in ttl:
+            ttl.append(tt)
+    sobj.configuration["vlist"] = tvl
+    sobj.configuration["tlist"] = ttl
     sobj.configuration["slist"] = data.get("slist", score.slist)
-    sobj.dataobj.colinfo["dim_match"]["clusters"] = data.get("dim_clusters", [])
-    sobj.dataobj.colinfo["col_names_simi"]["clusters"] = data.get("sem_clusters", [])
+    sobj.dataobj.colinfo["dim_match"]["clusters"] = data.get("dim_clusters", sobj.dataobj.colinfo["dim_match"]["clusters"])
+    sobj.dataobj.colinfo["col_names_simi"]["clusters"] = data.get("sem_clusters", sobj.dataobj.colinfo["col_names_simi"]["clusters"])
     sobj.presearch()
     sobj.postsearchinitialization()
     stree = sobj.postsearch()
@@ -98,13 +110,27 @@ def addT():
     datastr = request.get_data().decode("utf-8")
     data = json.loads(datastr)
     global sheet, sobj, stree, visdata
-    # print(sheet.data)
-    sobj = searchobj(dataobj=sheet)
     pid = data.get("pid", None)
     t = data.get("t", None)
     para = data.get("para", {})
     ret = sobj.singletransformation(pid, t, **para)
-    return json.dumps(ret)
+    return json.dumps({
+        "result": ret,
+        "highlight": ret["nodes"][-1]["id"]
+    })
+
+@app.route('/vis/addV', methods=['POST'])
+def addV():
+    datastr = request.get_data().decode("utf-8")
+    data = json.loads(datastr)
+    global sheet, sobj, stree, visdata
+    vtype = data.get("vtype", None)
+    channels = data.get("channels", None)
+    ret = sobj.addvisualization(vtype, channels)
+    return json.dumps({
+        "result": ret,
+        "highlight": ret["nodes"][-1]["id"]
+    })
 
 
 if __name__ == '__main__':

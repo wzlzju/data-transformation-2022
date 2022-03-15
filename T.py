@@ -179,8 +179,6 @@ tlist = {
 
 numtl = ["pca", "tsne", "mds", "umap", "null_num", "null_num1"]
 cattl = ["dbscan", "kmeans", "lda", "null_nom1", "null_nom"]
-# numtl = ["pca", "null_num"]
-# cattl = ["kmeans", "lda", "null_nom1", "null_nom"]
 
 class tpath(list):
     def __lt__(self, other):

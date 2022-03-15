@@ -1365,23 +1365,16 @@ class searchobj:
         self.tree2front = ret
         return ret
 
-    def singletransformation(self, pid, t, **kwargs):
+    def singletransformation(self, pid, t, **para):
         if pid is None or t is None:
             return self.tree2front
-        nidl = pid.split(SEPERATION)
-        tp = [Tstr2obj(nidl[i]) for i in range(1, len(nidl))]
-        ndata = self.dataobj.data
-        for t in tp:
-            if tp.get("t", None) is not None:
-                ndata = Tbasic(ndata, t)
-            else:
-                ndata = transform(ndata, coret=t, tpath=None)
+        ndata = self.nid2ndata(pid)
         if t in dmTl:
             ct = {
                 "name": t,
                 "input": tlist[t]["input"],
                 "output": tlist[t]["output"],
-                "para": kwargs if kwargs is not None and len(kwargs) > 0 else tlist[t]["para"]
+                "para": para if para is not None and len(para) > 0 else tlist[t]["para"]
             }
             cid = pid + SEPERATION + str(ct)
             ndata = transform(ndata, coret=ct, tpath=None)
@@ -1393,11 +1386,11 @@ class searchobj:
         else:
             ct = {
                 "t": t,
-                "i_type": kwargs.get("i_type", "num"),
-                "i": kwargs.get("i", []),
-                "o_type": kwargs.get("o_type", "new_table"),
-                "args": kwargs.get("args", ()),
-                "kwargs": kwargs.get("kwargs", {}),
+                "i_type": para.get("i_type", "num"),
+                "i": para.get("i", []),
+                "o_type": para.get("o_type", "new_table"),
+                "args": para.get("args", ()),
+                "kwargs": para.get("kwargs", {}),
                 "index": "default"
             }
             cid = pid + SEPERATION + str(ct)
@@ -1422,6 +1415,324 @@ class searchobj:
         })
         return self.tree2front
 
+    def addvisualization(self, vtype, channels):
+        if vtype == "scatter":
+            xypid = channels["xy"]
+            xy = self.nid2ndata(xypid).select_dtypes(include=["int", "float"])
+            if len(xy.columns) > 2:
+                xy = xy[xy.columns[:2]]
+            elif len(xy.columns) < 2:
+                print("user selected xy < 2 in <searchobj.addvisualization>")
+                raise Exception("user selected channel error")
+            colorpid = channels.get("color", None)
+            legend2color = {}
+            if colorpid is None or len(colorpid) == 0:
+                vid = "scatter" + "<VIS>" + xypid
+                vdata = [{
+                    "x": float(xy[xy.columns[0]][i]),
+                    "y": float(xy[xy.columns[1]][i]),
+                    "color": [141/255, 211/255, 199/255],
+                    "text": str((self.dataobj.data[self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[i])
+                } for i in range(len(xy))]
+            else:
+                vid = "scatter" + "<VIS>" + xypid + SEPERATION+SEPERATION + colorpid
+                color = self.nid2ndata(colorpid).select_dtypes(include=["int", "float"])
+                if isinstance(color, pd.DataFrame):
+                    color = color[color.columns[0]]
+                cat2legend = {}
+                if str(color.dtype).startswith("int"):
+                    if color.dtype == "float64":
+                        color = color.astype("int64")
+                    if color.dtype == "int64":
+                        for co in np.unique(color.values):
+                            if co < 0:
+                                cat2legend[co] = "outliers"
+                            else:
+                                cat2legend[co] = "cluster " + str(co + 1)
+                    elif color.dtype == "object":
+                        idata = color
+                        if isinstance(idata, pd.Series):
+                            idata = pd.DataFrame(idata)
+                        categoriesset = np.unique(idata.values)
+                        cat2legend = {idx: lege for idx, lege in enumerate(categoriesset)}
+                        odata = idata.apply(lambda x: int(np.argwhere(categoriesset == x.values)), axis=1)
+                        color = odata
+                if str(color.dtype).startswith("int"):
+                    # nominal data -> color
+                    # palette = [[141, 211, 199], [255, 255, 179], [190, 186, 218], [251, 128, 114], [128, 177, 211],
+                    #            [253, 180, 98], [179, 222, 105], [252, 205, 229], [217, 217, 217], [188, 128, 189]]
+                    # palette = [[v / 255 for v in c] for c in palette]
+                    palette = seaborn.color_palette("muted", n_colors=max(color) + 1)
+                    # prepare for the outliers
+                    palette.append(OUTLIERCOLOR)
+
+                    c = np.array([palette[int(ci) % len(palette)] for ci in np.array(color)])
+                    for cat in cat2legend.keys():
+                        legend2color[cat2legend[cat]] = palette[int(cat) % len(palette)]
+                elif str(color.dtype).startswith("float"):
+                    # numerical data -> color
+                    color = color - min(color)
+                    color = color / max(color)
+                    palette = [[8, 48, 107], [222, 235, 247]]
+                    palette = [[v / 255 for v in c] for c in palette]
+                    palette = np.array(palette)
+                    c = np.array([(palette[0] - palette[1]) * float(ci) + palette[1] for ci in np.array(color)])
+                vdata = [{
+                    "x": float(xy[xy.columns[0]][i]),
+                    "y": float(xy[xy.columns[1]][i]),
+                    "color": [float(ti) for ti in c[i]],
+                    "text": str((self.dataobj.data[self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[i])
+                } for i in range(len(color))]
+            self.tree2front["nodes"].append({
+                "id": vid,
+                "node_type": "V",
+                "data": {
+                        "chart_type": "scatter",
+                        "data": vdata,
+                        "legend": legend2color,
+                        "xlabel": xy.columns[0],
+                        "ylabel": xy.columns[1],
+                        "yaxis": {}
+                    }
+                })
+            self.tree2front["vis_list"].append({
+                "chart_type": "scatter",
+                "data": vdata,
+                "legend": legend2color,
+                "xlabel": xy.columns[0],
+                "ylabel": xy.columns[1],
+                "yaxis": {},
+                "paths": {
+                    "nodes": [vid],
+                    "edges": []
+                }
+            })
+            self.tree2front["edges"].append({
+                "from": xypid,
+                "to": vid
+            })
+            if colorpid is not None and len(colorpid) > 0:
+                self.tree2front["edges"].append({
+                    "from": colorpid,
+                    "to": vid
+                })
+        elif vtype == "line":
+            ypid = channels["y"]
+            y = self.nid2ndata(ypid).select_dtypes(include=["int", "float"])
+
+            xpid = channels.get("x", None)
+            if xpid is None or len(xpid) == 0:
+                vid = "line" + "<VIS>" + ypid
+
+                if isinstance(y, pd.Series):
+                    y = pd.DataFrame(y)
+
+                catflag = False
+                yaxis = {}
+                if y.values.dtype == "object" and len(y.columns) == 1:
+                    catflag = True
+                    dataeleset = np.unique(y.values)
+                    yaxis = {i + 1: e for i, e in enumerate(dataeleset)}
+                    data = np.array([int(np.argwhere(dataeleset == i)) + 1 for i in y.values])
+                    y = pd.DataFrame(data)
+
+                cs = {}
+                x = list(range(len(y)))
+
+                if not catflag:
+                    vchart_type = "line"
+                    vdata = [{
+                        "x": x[i],
+                        "y": [float(y[col][i]) for col in y.columns],
+                        "text": str((self.dataobj.data[self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[i])
+                    } for i in range(len(y))]
+                    vlegend = list(y.columns)
+                    vxlabel = ""
+                    vylabel = y.columns[0] if len(y.columns) == 1 else ""
+                    vyaxis = yaxis
+                else:
+                    vchart_type = "cat_line"
+                    vdata = [{
+                        "x": x[i],
+                        "y": [int(y[col][i]) for col in y.columns],
+                        "text": str(
+                            (self.dataobj.data[self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[
+                                i])
+                    } for i in range(len(y))]
+                    vlegend = list(y.columns)
+                    vxlabel = ""
+                    vylabel = y.columns[0] if len(y.columns) == 1 else ""
+                    vyaxis = yaxis
+            else:
+                vid = "line" + "<VIS>" + xpid + SEPERATION + SEPERATION + ypid
+
+                x = self.nid2ndata(xpid).select_dtypes(include=["int", "float"])
+                if isinstance(x, pd.Series):
+                    x = pd.DataFrame(x)
+
+                sortTOKEN = "<SORTBY>"
+                x.columns = pd.Index([sortTOKEN + x.columns[0]])
+
+                if isinstance(y, pd.Series):
+                    y = pd.DataFrame(y)
+
+                catflag = False
+                yaxis = {}
+                if y.values.dtype == "object" and len(y.columns) == 1:
+                    catflag = True
+                    dataeleset = np.unique(y.values)
+                    yaxis = {i + 1: e for i, e in enumerate(dataeleset)}
+                    data = np.array([int(np.argwhere(dataeleset == i)) + 1 for i in y.values])
+                    y = pd.DataFrame(data)
+
+                tmpxy = pd.concat([x, y], axis=1)
+                tmpxy = tmpxy.sort_values(by=tmpxy.columns[0])
+                xrank = x[x.columns[0]].rank(method="first")
+                tmpx = tmpxy[tmpxy.columns[0]]
+                tmpy = tmpxy[tmpxy.columns[1:]]
+
+                if not catflag:
+                    vchart_type = "line"
+                    vdata = [{
+                        "x": int(tmpx[i]),
+                        "y": [float(tmpy[col][i]) for col in tmpy.columns],
+                        "text": str((self.dataobj.data[self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[int(np.argwhere(xrank.values == (i + 1)))])
+                    } for i in range(len(tmpy))]
+                    vlegend = list(tmpy.columns)
+                    vxlabel = tmpxy.columns[0].replace(sortTOKEN, "")
+                    vylabel = tmpy.columns[0] if len(tmpy.columns) == 1 else ""
+                    vyaxis = yaxis
+                else:
+                    vchart_type = "cat_line"
+                    vdata = [{
+                        "x": int(tmpx[i]),
+                        "y": [int(tmpy[col][i]) for col in tmpy.columns],
+                        "text": str((self.dataobj.data[self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[int(np.argwhere(xrank.values == (i + 1)))])
+                    } for i in range(len(tmpy))]
+                    vlegend = list(tmpy.columns)
+                    vxlabel = tmpxy.columns[0].replace(sortTOKEN, "")
+                    vylabel = tmpy.columns[0] if len(tmpy.columns) == 1 else ""
+                    vyaxis = yaxis
+            self.tree2front["nodes"].append({
+                "id": vid,
+                "node_type": "V",
+                "data": {
+                    "chart_type": vchart_type,
+                    "data": vdata,
+                    "legend": vlegend,
+                    "xlabel": vxlabel,
+                    "ylabel": vylabel,
+                    "yaxis": vyaxis
+                }
+            })
+            self.tree2front["vis_list"].append({
+                "chart_type": vchart_type,
+                "data": vdata,
+                "legend": vlegend,
+                "xlabel": vxlabel,
+                "ylabel": vylabel,
+                "yaxis": vyaxis,
+                "paths": {
+                    "nodes": [vid],
+                    "edges": []
+                }
+            })
+            self.tree2front["edges"].append({
+                "from": ypid,
+                "to": vid
+            })
+            if xpid is not None and len(xpid) > 0:
+                self.tree2front["edges"].append({
+                    "from": xpid,
+                    "to": vid
+                })
+        elif vtype == "bar":
+            xpid = channels["x"]
+            x = self.nid2ndata(xpid).select_dtypes(include=["int", "float"])
+            ypid = channels["y"]
+            y = self.nid2ndata(ypid).select_dtypes(include=["int", "float"])
+            vid = "bar" + "<VIS>" + xpid + SEPERATION + SEPERATION + ypid
+
+            if isinstance(x, pd.Series):
+                x = pd.DataFrame(x)
+            x = x.astype("str")
+
+            if isinstance(y, pd.Series):
+                y = pd.DataFrame(y)
+
+            tmpxy = pd.concat([x, y], axis=1)
+            try:
+                groups = tmpxy.groupby(tmpxy.columns[0])
+            except:
+                print("user selected columns cannot be grouped")
+                raise Exception("user selected error")
+            y = None
+            for xcat, gy in groups:
+                ny = pd.DataFrame([[len(gy), xcat]], columns=pd.Index(["COUNT", x.columns[0]]))
+                if y is None:
+                    y = ny
+                else:
+                    y = pd.concat([y, ny])
+            y.index = pd.RangeIndex(len(y))
+            ndata = y
+            y = y[y.columns[:-1]]
+            y = y.astype("float64")
+
+            vchart_type = "bar"
+            vdata = [{
+                    "x": ndata[ndata.columns[-1]][i],
+                    "y": [float(y[col][i]) for col in y.columns],
+                    "text": ""
+                } for i in range(len(y))]
+            vlegend = list(y.columns)
+            vxlabel = ndata.columns[-1]
+            vylabel = ""
+            vyaxis = {}
+            self.tree2front["nodes"].append({
+                "id": vid,
+                "node_type": "V",
+                "data": {
+                    "chart_type": vchart_type,
+                    "data": vdata,
+                    "legend": vlegend,
+                    "xlabel": vxlabel,
+                    "ylabel": vylabel,
+                    "yaxis": vyaxis
+                }
+            })
+            self.tree2front["vis_list"].append({
+                "chart_type": vchart_type,
+                "data": vdata,
+                "legend": vlegend,
+                "xlabel": vxlabel,
+                "ylabel": vylabel,
+                "yaxis": vyaxis,
+                "paths": {
+                    "nodes": [vid],
+                    "edges": []
+                }
+            })
+            self.tree2front["edges"].append({
+                "from": xpid,
+                "to": vid
+            })
+            self.tree2front["edges"].append({
+                "from": ypid,
+                "to": vid
+            })
+        return self.tree2front
+
+
+    def nid2ndata(self, nid):
+        nidl = nid.split(SEPERATION)
+        tp = [Tstr2obj(nidl[i]) for i in range(1, len(nidl))]
+        ndata = self.dataobj.data
+        for t in tp:
+            if t.get("t", None) is not None:
+                ndata = Tbasic(ndata, t)
+            else:
+                ndata = transform(ndata, coret=t, tpath=None)
+        return ndata
 
     def deconstruct(self):
         if MULTIPROCESS:
@@ -1432,7 +1743,7 @@ class searchobj:
 
 
 if __name__ == "__main__":
-    sheet = spreadsheet("./testdata/ie19b.csv", encoding="unicode_escape", keep_default_na=False)
+    sheet = spreadsheet("./testdata/5w-allRules-10%Noise.csv", encoding="unicode_escape", keep_default_na=False)
     # sheet = spreadsheet("./testdata/training2.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/ZYF1/req0215/iris.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/NetflixOriginals.csv", encoding="unicode_escape", keep_default_na=False)
@@ -1445,8 +1756,13 @@ if __name__ == "__main__":
     visdata = so.assemblevisdata(round=1)
     # so.showtest()
     # so.showtest(idx={"xy": [0, 1, 2], "color": [0, 1]})
+    so.dataobj.colinfo["dim_match"]["clusters"] = []
+    so.dataobj.colinfo["col_names_simi"]["clusters"] = []
     so.assembleandevaluevis()
     tree2front = so.assembleTtree()
     print(tree2front)
+    so.singletransformation("r", "select", i_type="==", i=["exp0", "exp1"])
+    so.singletransformation("r", "select", i_type="==", i=["exp3"])
+    so.addvisualization("scatter", {"color": so.tree2front["nodes"][-1]["id"],  "xy": so.tree2front["nodes"][-2]["id"]})
 
 
