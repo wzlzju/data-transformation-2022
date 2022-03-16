@@ -113,6 +113,7 @@ def addT():
     pid = data.get("pid", None)
     t = data.get("t", None)
     para = data.get("para", {})
+    print("add T")
     ret = sobj.singletransformation(pid, t, **para)
     return json.dumps({
         "result": ret,
@@ -121,6 +122,7 @@ def addT():
 
 @app.route('/vis/addV', methods=['POST'])
 def addV():
+    print("add V")
     datastr = request.get_data().decode("utf-8")
     data = json.loads(datastr)
     global sheet, sobj, stree, visdata

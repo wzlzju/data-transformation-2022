@@ -1436,7 +1436,7 @@ class searchobj:
                 } for i in range(len(xy))]
             else:
                 vid = "scatter" + "<VIS>" + xypid + SEPERATION+SEPERATION + colorpid
-                color = self.nid2ndata(colorpid).select_dtypes(include=["int", "float"])
+                color = self.nid2ndata(colorpid)
                 if isinstance(color, pd.DataFrame):
                     color = color[color.columns[0]]
                 cat2legend = {}
