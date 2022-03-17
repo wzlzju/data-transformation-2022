@@ -40,14 +40,16 @@ class searchobj:
             "tlist": tlist.keys(),
             "slist": score.slist
         }
+        self.threadsharing = threadsharing
 
 
     def presearch(self):
+        self.threadsharing[0] = [t for t in self.configuration["tlist"] if t not in ["null_num1", "null_nom", "null_nom1", "lida", "test"]]
         for t in self.configuration["tlist"]:
             if t not in numtl and t not in cattl:
                 continue
             self.tpathsets[t] = set()
-            rept = getRepT(t)
+            rept = getRepT(t, self.threadsharing)
             if rept in self.tpathpools.keys():
                 continue
             if MULTIPROCESS:
@@ -65,9 +67,9 @@ class searchobj:
                 continue
             print("\t", t)
             if MULTIPROCESS:
-                ctpaths = self.tpathpools[getRepT(t)].get(True)
+                ctpaths = self.tpathpools[getRepT(t, self.threadsharing)].get(True)
             else:
-                ctpaths = self.tpathpools[getRepT(t)]
+                ctpaths = self.tpathpools[getRepT(t, self.threadsharing)]
             for i, (v, ctpath) in enumerate(ctpaths):
                 printTP(ctpath, TAB="\t\t")
 
@@ -226,9 +228,9 @@ class searchobj:
         if not isinstance(t, str):
             t = t["name"]
         if MULTIPROCESS:
-            pool = self.tpathpools[getRepT(t)].get(True)
+            pool = self.tpathpools[getRepT(t, self.threadsharing)].get(True)
         else:
-            pool = self.tpathpools[getRepT(t)]
+            pool = self.tpathpools[getRepT(t, self.threadsharing)]
         return pool
         # if t["name"] == "pca":
         #     return []
@@ -1053,6 +1055,9 @@ class searchobj:
                                 cs["cor"] = mean(corl)
 
                         if not catflag:
+                            tdata = pd.concat([y, self.dataobj.data[self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]]], axis=1)
+                            tdata = tdata.sort_values(by=tdata.columns[0])
+                            tdata.index = pd.RangeIndex(len(tdata))
                             self.visbuffer["line"].append((mean(cs.values()), {
                                 "pnodes": {
                                     "y": "r" + SEPERATION + SEPERATION.join([str(t) for t in y_tpath]) + SEPERATION + str(y_coret)
@@ -1060,32 +1065,32 @@ class searchobj:
                                 "chart_type": "line",
                                 "data": [{
                                     "x": x[i],
-                                    "y": [float(y[col][i]) for col in y.columns],
-                                    "text": str((self.dataobj.data[
-                                        self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[i])
-                                } for i in range(len(y))],
-                                "legend": list(y.columns),
+                                    "y": [float(tdata[col][i]) for col in tdata.columns[:-1]],
+                                    "text": str(tdata[tdata.columns[-1]][i])
+                                } for i in range(len(tdata))],
+                                "legend": list(tdata.columns[:-1]),
                                 "xlabel": "",
                                 "ylabel": y.columns[0] if len(y.columns) == 1 else ""
                             }))
                         else:
-                            self.visbuffer["cat_line"].append((mean(cs.values()), {
-                                "pnodes": {
-                                    "y": "r" + SEPERATION + SEPERATION.join(
-                                        [str(t) for t in y_tpath]) + SEPERATION + str(y_coret)
-                                },
-                                "chart_type": "cat_line",
-                                "data": [{
-                                    "x": x[i],
-                                    "y": [int(y[col][i]) for col in y.columns],
-                                    "text": str((self.dataobj.data[
-                                        self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[i])
-                                } for i in range(len(y))],
-                                "legend": list(y.columns),
-                                "xlabel": "",
-                                "ylabel": y.columns[0] if len(y.columns) == 1 else "",
-                                "yaxis": yaxis
-                            }))
+                            if CAT_LINE:
+                                self.visbuffer["cat_line"].append((mean(cs.values()), {
+                                    "pnodes": {
+                                        "y": "r" + SEPERATION + SEPERATION.join(
+                                            [str(t) for t in y_tpath]) + SEPERATION + str(y_coret)
+                                    },
+                                    "chart_type": "cat_line",
+                                    "data": [{
+                                        "x": x[i],
+                                        "y": [int(y[col][i]) for col in y.columns],
+                                        "text": str((self.dataobj.data[
+                                            self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]])[i])
+                                    } for i in range(len(y))],
+                                    "legend": list(y.columns),
+                                    "xlabel": "",
+                                    "ylabel": y.columns[0] if len(y.columns) == 1 else "",
+                                    "yaxis": yaxis
+                                }))
 
                 elif cvisd["_chart_type"].startswith("rel"):
                     xs = cvisd["x"]
@@ -1157,6 +1162,7 @@ class searchobj:
 
                             tmpxy = pd.concat([x, y], axis=1)
                             tmpxy = tmpxy.sort_values(by=tmpxy.columns[0])
+                            tmpxy.index = pd.RangeIndex(len(tmpxy))
                             xrank = x[x.columns[0]].rank(method="first")
                             tmpx = tmpxy[tmpxy.columns[0]]
                             tmpy = tmpxy[tmpxy.columns[1:]]
@@ -1440,16 +1446,8 @@ class searchobj:
                 if isinstance(color, pd.DataFrame):
                     color = color[color.columns[0]]
                 cat2legend = {}
-                if str(color.dtype).startswith("int"):
-                    if color.dtype == "float64":
-                        color = color.astype("int64")
-                    if color.dtype == "int64":
-                        for co in np.unique(color.values):
-                            if co < 0:
-                                cat2legend[co] = "outliers"
-                            else:
-                                cat2legend[co] = "cluster " + str(co + 1)
-                    elif color.dtype == "object":
+                if not str(color.dtype).startswith("int") and not str(color.dtype).startswith("float"):
+                    if color.dtype == "object":
                         idata = color
                         if isinstance(idata, pd.Series):
                             idata = pd.DataFrame(idata)
@@ -1518,7 +1516,7 @@ class searchobj:
                 })
         elif vtype == "line":
             ypid = channels["y"]
-            y = self.nid2ndata(ypid).select_dtypes(include=["int", "float"])
+            y = self.nid2ndata(ypid)
 
             xpid = channels.get("x", None)
             if xpid is None or len(xpid) == 0:
@@ -1566,9 +1564,11 @@ class searchobj:
             else:
                 vid = "line" + "<VIS>" + xpid + SEPERATION + SEPERATION + ypid
 
-                x = self.nid2ndata(xpid).select_dtypes(include=["int", "float"])
+                x = self.nid2ndata(xpid)
                 if isinstance(x, pd.Series):
                     x = pd.DataFrame(x)
+                x = x.select_dtypes(include=["int", "float"])
+                x = x[x.columns[0]]
 
                 sortTOKEN = "<SORTBY>"
                 x.columns = pd.Index([sortTOKEN + x.columns[0]])
@@ -1648,9 +1648,9 @@ class searchobj:
                 })
         elif vtype == "bar":
             xpid = channels["x"]
-            x = self.nid2ndata(xpid).select_dtypes(include=["int", "float"])
+            x = self.nid2ndata(xpid)
             ypid = channels["y"]
-            y = self.nid2ndata(ypid).select_dtypes(include=["int", "float"])
+            y = self.nid2ndata(ypid)
             vid = "bar" + "<VIS>" + xpid + SEPERATION + SEPERATION + ypid
 
             if isinstance(x, pd.Series):
