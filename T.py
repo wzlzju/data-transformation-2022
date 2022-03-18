@@ -187,7 +187,7 @@ class tpath(list):
 
 basicTl = ['rank', 'aggr', 'sum', 'sub', 'mul', 'div']
 dmTl = ["pca", "tsne", "mds", "umap", "dbscan", "kmeans", "lda", "lida"]
-alignTl = ["pca", "tsne", "mds", "umap", "dbscan", "kmeans", "lda", "null_num", "null_num1"]
+alignTl = ["pca", "tsne", "mds", "umap", "dbscan", "kmeans", "lda"]
 
 threadsharing = [["pca", "tsne", "mds", "umap", "dbscan", "kmeans", "lda", "null_num"], ["lida"], ["null_nom1"], ["null_num1"], ["null_nom"], ["test"]]
 def getRepT(tname, share):

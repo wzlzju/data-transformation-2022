@@ -47,7 +47,7 @@ def transform(data, coret=None, tpath=None, tpathtree=None):
 
             ndata = Tbasic(ndata, t)
 
-            if tpathtree is not None:
+            if tpathtree is not None and ndata is not None:
                 if tpathtree[cid].data is None:
                     tpathtree[cid].data = list(ndata.columns)
             pid = cid
@@ -57,7 +57,7 @@ def transform(data, coret=None, tpath=None, tpathtree=None):
     if coret not in [None, "", " ", [], {}]:
         ndata = transformation_functions[coret["name"]](data=ndata, para=coret["para"])
         cid = pid + SEPERATION + str(coret)
-        if tpathtree is not None:
+        if tpathtree is not None and ndata is not None:
             if tpathtree[cid].data is None:
                 tpathtree[cid].data = list(ndata.columns) if isinstance(ndata, pd.DataFrame) else ([ndata.name] if ndata.name is not None else [0])
     if tpathtree is not None:
@@ -89,6 +89,10 @@ def Tbasic(data, t):
         odata = idata.apply(lambda x: x.sum(), *t["args"], **t["kwargs"])
     elif t["t"] == "mul":
         odata = idata.apply(lambda x: x.product(), *t["args"], **t["kwargs"])
+    elif t["t"] == "sub":
+        odata = pd.DataFrame(idata[idata.columns[0]]-idata[idata.columns[1]])
+    elif t["t"] == "div":
+        odata = pd.DataFrame(idata[idata.columns[0]]/idata[idata.columns[1]]).fillna(0)
     elif t["t"] == "select":
         odata = idata
     elif t["t"] == "rank":
@@ -131,42 +135,56 @@ def Tbasic(data, t):
     return ndata
 
 def Tpca(data, para):
+    if errorinputforcoreT(data):
+        return None
     ndata = data.select_dtypes(include=["int", "float"])
     res = ppca(ndata, **para)   # numpy result
 
     return pd.DataFrame(res, columns=pd.Index(["PC1", "PC2"]))
 
 def Ttsne(data, para):
+    if errorinputforcoreT(data):
+        return None
     ndata = data.select_dtypes(include=["int", "float"])
     res = ptsne(ndata, **para)  # numpy result
 
     return pd.DataFrame(res, columns=pd.Index(["tSNE-1", "tSNE-2"])).astype("float64")
 
 def Tmds(data, para):
+    if errorinputforcoreT(data):
+        return None
     ndata = data.select_dtypes(include=["int", "float"])
     res = pmds(ndata, **para)  # numpy result
 
     return pd.DataFrame(res, columns=pd.Index(["MDS-1", "MDS-2"])).astype("float64")
 
 def Tumap(data, para):
+    if errorinputforcoreT(data):
+        return None
     ndata = data.select_dtypes(include=["int", "float"])
     res = pumap(ndata, **para)  # numpy result
 
     return pd.DataFrame(res, columns=pd.Index(["UMAP-1", "UMAP-2"])).astype("float64")
 
 def Tlda(data, para):
+    if errorinputforcoreT(data):
+        return None
     ndata = data.select_dtypes(include=["int", "float"])
     res = plda(ndata, **para)   # numpy result
 
     return pd.Series(res, name="Category by LDA")
 
 def Tdbscan(data, para):
+    if errorinputforcoreT(data):
+        return None
     ndata = data.select_dtypes(include=["int", "float"])
     res = pdbscan(ndata, **para)   # numpy result
 
     return pd.Series(res, name="Category by DBSCAN")
 
 def Tkmeans(data, para):
+    if errorinputforcoreT(data):
+        return None
     ndata = data.select_dtypes(include=["int", "float"])
     res = pkmeans(ndata, **para)   # numpy result
 
@@ -187,7 +205,10 @@ def Tnullcat(data, para):
 def Ttest(data, para):
     return data
 
-
+def errorinputforcoreT(data):
+    if not isinstance(data, pd.DataFrame) or len(data.columns) <= 2:
+        return True
+    return False
 
 def printTP(tp, TAB=""):
     print(TAB, "Tpath:")

@@ -75,7 +75,7 @@ def plda(data, n_components=4):
 
 def clean_col_name(s):
     return (s[1:] if s.startswith(" ") else s).replace(':', '_').replace(',', "_").replace(';', '_').replace('.', '_').replace('?', '_').replace('/', '_')\
-        .replace('*', '_').replace('!', '_').replace('(', '_').replace(')', '_').replace(' ', '_')
+        .replace('*', '_').replace('!', '_').replace('(', '_').replace(')', '_').replace('@', '_').replace('%', '_').replace(' ', '_')
 
 def removetokenincolname(s):
     if s.startswith("token"):

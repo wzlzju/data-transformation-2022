@@ -65,13 +65,15 @@ class searchobj:
         for t in self.configuration["tlist"]:
             if t not in numtl and t not in cattl:
                 continue
-            print("\t", t)
+            if DEBUG:
+                print("\t", t)
             if MULTIPROCESS:
                 ctpaths = self.tpathpools[getRepT(t, self.threadsharing)].get(True)
             else:
                 ctpaths = self.tpathpools[getRepT(t, self.threadsharing)]
-            for i, (v, ctpath) in enumerate(ctpaths):
-                printTP(ctpath, TAB="\t\t")
+            if DEBUG:
+                for i, (v, ctpath) in enumerate(ctpaths):
+                    printTP(ctpath, TAB="\t\t")
 
 
     def postsearchinitialization(self):
@@ -294,6 +296,8 @@ class searchobj:
                     if ndata is None:
                         ndata, self.tpathtree = transform(self.dataobj.data, coret, tpath, self.tpathtree)
                         resdatabuffer[idxstr] = ndata
+                    if ndata is None:
+                        continue
                     vd[in_.data["inputname"]].append({
                         "data": ndata,
                         "coret": coret,
@@ -861,6 +865,8 @@ class searchobj:
                             palette = [[v / 255 for v in c] for c in palette]
                             palette = np.array(palette)
                             c = np.array([(palette[0]-palette[1])*float(ci) + palette[1] for ci in np.array(color)])
+                            legend2color["Min "+color.name] = [float(i) for i in palette[1]]
+                            legend2color["Max "+color.name] = [float(i) for i in palette[0]]
 
                         self.visbuffer["scatter"].append((mean(cs.values()), {
                             "pnodes": {
@@ -1156,7 +1162,7 @@ class searchobj:
                                 yaxis = {i + 1: e for i, e in enumerate(dataeleset)}
                                 data = np.array([int(np.argwhere(dataeleset == i)) + 1 for i in y.values])
                                 if not y_coret["name"].startswith("null"):
-                                    y = pd.DataFrame(data, columns=pd.Index(["Category by " + x_coret["name"].upper()]))
+                                    y = pd.DataFrame(data, columns=pd.Index(["Category by " + y_coret["name"].upper()]))
                                 else:
                                     y = pd.DataFrame(data)
 
@@ -1571,7 +1577,7 @@ class searchobj:
                 x = x[x.columns[0]]
 
                 sortTOKEN = "<SORTBY>"
-                x.columns = pd.Index([sortTOKEN + x.columns[0]])
+                x.name = sortTOKEN + x.name
 
                 if isinstance(y, pd.Series):
                     y = pd.DataFrame(y)
