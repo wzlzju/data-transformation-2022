@@ -94,8 +94,8 @@ def search_begin():
     sobj.configuration["vlist"] = tvl
     sobj.configuration["tlist"] = ttl
     sobj.configuration["slist"] = data.get("slist", score.slist)
-    sobj.dataobj.colinfo["dim_match"]["clusters"] = data.get("dim_clusters", sobj.dataobj.colinfo["dim_match"]["clusters"])
-    sobj.dataobj.colinfo["col_names_simi"]["clusters"] = data.get("sem_clusters", sobj.dataobj.colinfo["col_names_simi"]["clusters"])
+    sobj.dataobj.colinfo["dim_match"]["clusters"] = data.get("dim_clusters", [])
+    sobj.dataobj.colinfo["col_names_simi"]["clusters"] = data.get("sem_clusters", [])
     sobj.presearch()
     sobj.postsearchinitialization()
     stree = sobj.postsearch()

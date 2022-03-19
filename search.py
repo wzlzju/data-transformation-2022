@@ -698,6 +698,9 @@ class searchobj:
         }
         for _, cvisd in enumerate(self.visdata):
             if cvisd["_chart_type"].endswith("scatter"):
+                if not NUM_SCATTER:
+                    if cvisd["_chart_type"] == "num_scatter":
+                        continue
                 xys = cvisd["xy"]
                 colors = cvisd["color"]
 
@@ -865,8 +868,8 @@ class searchobj:
                             palette = [[v / 255 for v in c] for c in palette]
                             palette = np.array(palette)
                             c = np.array([(palette[0]-palette[1])*float(ci) + palette[1] for ci in np.array(color)])
-                            legend2color["Min "+color.name] = [float(i) for i in palette[1]]
-                            legend2color["Max "+color.name] = [float(i) for i in palette[0]]
+                            legend2color["__Min"] = [float(i) for i in palette[1]]
+                            legend2color["__Max"] = [float(i) for i in palette[0]]
 
                         self.visbuffer["scatter"].append((mean(cs.values()), {
                             "pnodes": {
@@ -1237,10 +1240,37 @@ class searchobj:
         self.visbuffer["line"].sort(key=lambda x: x[0], reverse=True)
         self.visbuffer["cat_line"].sort(key=lambda x: x[0], reverse=True)
         self.visbuffer["bar"].sort(key=lambda x: x[0], reverse=True)
+        #   duplication removal
+        self.visbuffer["scatter"] = self.duplicationremoval(self.visbuffer["scatter"])
+        self.visbuffer["line"] = self.duplicationremoval(self.visbuffer["line"])
+        self.visbuffer["cat_line"] = self.duplicationremoval(self.visbuffer["cat_line"])
+        self.visbuffer["bar"] = self.duplicationremoval(self.visbuffer["bar"])
+        # assemble
         self.vis = self.visbuffer["scatter"][:min(int(len(self.visbuffer["scatter"])*RECOMMENDPCT)+1, MAXSCATTER)] + \
                     self.visbuffer["line"][:min(int(len(self.visbuffer["line"]) * RECOMMENDPCT) + 1, MAXLINE)] + \
                     self.visbuffer["cat_line"][:min(int(len(self.visbuffer["cat_line"]) * RECOMMENDPCT) + 1, MAXCATLINE)] + \
                     self.visbuffer["bar"][:min(int(len(self.visbuffer["bar"]) * RECOMMENDPCT) + 1, MAXBAR)]
+
+    def duplicationremoval(self, visbuffer):
+        infolist = [{
+            "chart_type": v[1]["chart_type"]
+        } for v in visbuffer]
+        for i, v in enumerate(visbuffer):
+            for k in v[1]["pnodes"].keys():
+                id = v[1]["pnodes"][k]
+                tp = self.nid2tpath(id)
+                infolist[i][k] = " ".join([t["t"] if t.get("t", None) is not None else t["name"] for t in tp])
+        remove = [False] * len(visbuffer)
+        for i in range(1, len(visbuffer)):
+            for j in range(0, i):
+                if infolist[i] == infolist[j]:
+                    remove[i] = True
+                    break
+        ret = []
+        for i in range(len(visbuffer)):
+            if not remove[i]:
+                ret.append(visbuffer[i])
+        return ret
 
     def assembleTtree(self):
         """
@@ -1261,8 +1291,8 @@ class searchobj:
                 }
             }],
             "edges": [{
-                "from": ,   # id
-                "to": ,     # id
+                "source: ,   # id
+                "target": ,     # id
                 ("data":    # )
             }],
             "vis_list": [{
@@ -1275,8 +1305,8 @@ class searchobj:
                 "paths": {
                     "nodes": [ ],   # id
                     "edges": [{
-                        "from": ,   # id
-                        "to":       # id
+                        "source": ,   # id
+                        "target":       # id
                     }]
                 }
             }]
@@ -1356,23 +1386,23 @@ class searchobj:
                             }
                         })
                         ret["edges"].append({
-                            "from": pid,
-                            "to": cid
+                            "source": pid,
+                            "target": cid
                         })
                     if cid not in ret["vis_list"][-1]["paths"]["nodes"]:
                         ret["vis_list"][-1]["paths"]["nodes"].append(cid)
                         ret["vis_list"][-1]["paths"]["edges"].append({
-                            "from": pid,
-                            "to": cid
+                            "source": pid,
+                            "target": cid
                         })
                 ret["edges"].append({
-                    "from": cid,
-                    "to": vid,
+                    "source": cid,
+                    "target": vid,
                     "data": None
                 })
                 ret["vis_list"][-1]["paths"]["edges"].append({
-                    "from": cid,
-                    "to": vid
+                    "source": cid,
+                    "target": vid
                 })
         self.tree2front = ret
         return ret
@@ -1422,8 +1452,8 @@ class searchobj:
             "data": data
         })
         self.tree2front["edges"].append({
-            "from": pid,
-            "to": cid
+            "source": pid,
+            "target": cid
         })
         return self.tree2front
 
@@ -1512,13 +1542,13 @@ class searchobj:
                 }
             })
             self.tree2front["edges"].append({
-                "from": xypid,
-                "to": vid
+                "source": xypid,
+                "target": vid
             })
             if colorpid is not None and len(colorpid) > 0:
                 self.tree2front["edges"].append({
-                    "from": colorpid,
-                    "to": vid
+                    "source": colorpid,
+                    "target": vid
                 })
         elif vtype == "line":
             ypid = channels["y"]
@@ -1644,13 +1674,13 @@ class searchobj:
                 }
             })
             self.tree2front["edges"].append({
-                "from": ypid,
-                "to": vid
+                "source": ypid,
+                "target": vid
             })
             if xpid is not None and len(xpid) > 0:
                 self.tree2front["edges"].append({
-                    "from": xpid,
-                    "to": vid
+                    "source": xpid,
+                    "target": vid
                 })
         elif vtype == "bar":
             xpid = channels["x"]
@@ -1719,15 +1749,19 @@ class searchobj:
                 }
             })
             self.tree2front["edges"].append({
-                "from": xpid,
-                "to": vid
+                "source": xpid,
+                "target": vid
             })
             self.tree2front["edges"].append({
-                "from": ypid,
-                "to": vid
+                "source": ypid,
+                "target": vid
             })
         return self.tree2front
 
+    def nid2tpath(self, nid):
+        nidl = nid.split(SEPERATION)
+        tp = [Tstr2obj(nidl[i]) for i in range(1, len(nidl))]
+        return tp
 
     def nid2ndata(self, nid):
         nidl = nid.split(SEPERATION)

@@ -143,6 +143,42 @@ def tpaththreadfunction(tname, colinfo, q):
                 pool.append((0, tpp))
                 if MULTIPROCESS:
                     updatequeue()
+        for t in basicTl:
+            num_dim_clusters = [listintersection(cluster, numcolnames) for cluster in colinfo["dim_match"]["clusters"]]
+            num_sem_clusters = [listintersection(cluster, numcolnames) for cluster in
+                                colinfo["col_names_simi"]["clusters"]]
+            num_clusters = [iii for iii in num_dim_clusters] + [jjj for jjj in num_sem_clusters if
+                                                                jjj not in num_dim_clusters]
+            if t in ['sum', 'sub', 'mul', 'div']:
+                # clusters matching
+                for i, cluster in enumerate(num_clusters):
+                    if ONLYPROCESSCLUSTERMORETHAN2:
+                        if len(cluster) == 2:
+                            continue
+                    if t in ['sub', 'div', 'mul'] and len(cluster) != 2:
+                        continue
+                    if len(cluster) > 1:
+                        new_colname = "%s:(%s)" % (t, ",".join(cluster))
+                        tpp = tpath()
+                        if hasRANK(cluster):
+                            continue
+                        tpp.append({
+                            "t": t,
+                            "i_type": "==",
+                            "i": cluster,
+                            "o_type": "new_table",
+                            "args": (),
+                            "kwargs": {"axis": 1},
+                            "index": pd.Index([new_colname])
+                        })
+                        pool.append((0, tpp))
+                        if MULTIPROCESS:
+                            updatequeue()
+            elif t == "rank":
+                pass
+            elif t == "aggr":
+                pass
+
     elif tinputtype == "num":
         # e.g., pca, lda, kmeans
 
@@ -151,7 +187,7 @@ def tpaththreadfunction(tname, colinfo, q):
 
         # dimension matching
         clusters = colinfo["dim_match"]["clusters"]
-        print("in thread", tname, clusters)
+        # print("in thread", tname, clusters)
         for i, cluster in enumerate(clusters):
             cur_cluster = listintersection(cluster, cur_columns)
             if len(cur_cluster) > 0:
@@ -172,7 +208,7 @@ def tpaththreadfunction(tname, colinfo, q):
                     updatequeue()
         # semantic matching
         clusters = colinfo["col_names_simi"]["clusters"]
-        print("in thread", tname, clusters)
+        # print("in thread", tname, clusters)
         for i, cluster in enumerate(clusters):
             cur_cluster = listintersection(cluster, cur_columns)
             if len(cur_cluster) > 0:

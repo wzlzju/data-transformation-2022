@@ -401,6 +401,7 @@ def significance_outstanding1(data):
     # maxv = data[0]
     # data = data / maxv
     idx = np.array([np.power(i, 0.7) for i in range(1, len(data) + 1)])
+    #####################################
     k = np.sum((data - np.mean(data)) * (idx - np.mean(idx))) / np.sum((data - np.mean(data)) ** 2)
     b = np.mean(data) - k * np.mean(idx)
     data_pred = [k * i + b for i in idx]
@@ -439,6 +440,7 @@ def significance_linearcorrelation(data):
         dataeleset = np.unique(data)
         data = np.array([int(np.argwhere(dataeleset == i))+1 for i in data])
     x = [i for i in range(1, len(data) + 1)]
+    #####################################
     k = np.sum((data - np.mean(data)) * (x- np.mean(x))) / np.sum((data - np.mean(data)) ** 2)
     b = np.mean(data) - k * np.mean(x)
     data_pred = [k * i + b for i in x]

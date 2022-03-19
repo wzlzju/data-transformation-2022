@@ -55,7 +55,16 @@ def transform(data, coret=None, tpath=None, tpathtree=None):
 
     # process the core transformation
     if coret not in [None, "", " ", [], {}]:
-        ndata = transformation_functions[coret["name"]](data=ndata, para=coret["para"])
+        if NOTCALCUDMT:
+            if coret["name"] in dmTl and sum([t["t"] in ["sum", "sub", "mul", "div"] for t in tpath]) > 0:
+                ndata = None
+            else:
+                ndata = transformation_functions[coret["name"]](data=ndata, para=coret["para"])
+        else:
+            ndata = transformation_functions[coret["name"]](data=ndata, para=coret["para"])
+        if coret["name"] == "null_num1":
+            if sum([t["t"] in ["sum", "sub", "mul", "div"] for t in tpath]) == 0:
+                ndata = None
         cid = pid + SEPERATION + str(coret)
         if tpathtree is not None and ndata is not None:
             if tpathtree[cid].data is None:
