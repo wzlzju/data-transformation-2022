@@ -44,7 +44,7 @@ class searchobj:
 
 
     def presearch(self):
-        self.threadsharing[0] = [t for t in self.configuration["tlist"] if t not in ["null_num1", "null_nom", "null_nom1", "lida", "test"]]
+        self.threadsharing[0] = [t for t in self.configuration["tlist"] if t not in ["null_num", "null_num1", "null_nom", "null_nom1", "lida", "test"]]
         for t in self.configuration["tlist"]:
             if t not in numtl and t not in cattl:
                 continue
@@ -694,7 +694,8 @@ class searchobj:
             "scatter": [],
             "line": [],
             "cat_line": [],
-            "bar": []
+            "sum_bar": [],
+            "count_bar": []
         }
         for _, cvisd in enumerate(self.visdata):
             if cvisd["_chart_type"].endswith("scatter"):
@@ -986,22 +987,38 @@ class searchobj:
                                     for j in range(i + 1, len(y.columns)):
                                         corl.append(score.significance_correlation(np.array([y[y.columns[i]].values, y[y.columns[j]].values])))
                                 cs["cor"] = mean(corl)
-
-                        self.visbuffer["bar"].append((mean(cs.values()), {
-                            "pnodes": {
-                                "x": "r" + SEPERATION + SEPERATION.join([str(t) for t in x_tpath]) + SEPERATION + str(x_coret),
-                                "y": "r" + SEPERATION + SEPERATION.join([str(t) for t in y_tpath]) + SEPERATION + str(y_coret)
-                            },
-                            "chart_type": "bar",
-                            "data": [{
-                                "x": ndata[ndata.columns[-1]][i],
-                                "y": [float(y[col][i]) for col in y.columns],
-                                "text": ""
-                            } for i in range(len(y))],
-                            "legend": list(y.columns),
-                            "xlabel": ndata.columns[-1],
-                            "ylabel": ""
-                        }))
+                        if cvisd["_chart_type"].startswith("sum"):
+                            self.visbuffer["sum_bar"].append((mean(cs.values()), {
+                                "pnodes": {
+                                    "x": "r" + SEPERATION + SEPERATION.join([str(t) for t in x_tpath]) + SEPERATION + str(x_coret),
+                                    "y": "r" + SEPERATION + SEPERATION.join([str(t) for t in y_tpath]) + SEPERATION + str(y_coret)
+                                },
+                                "chart_type": "sum_bar",
+                                "data": [{
+                                    "x": ndata[ndata.columns[-1]][i],
+                                    "y": [float(y[col][i]) for col in y.columns],
+                                    "text": ""
+                                } for i in range(len(y))],
+                                "legend": list(y.columns),
+                                "xlabel": ndata.columns[-1],
+                                "ylabel": ""
+                            }))
+                        if cvisd["_chart_type"].startswith("count"):
+                            self.visbuffer["count_bar"].append((mean(cs.values()), {
+                                "pnodes": {
+                                    "x": "r" + SEPERATION + SEPERATION.join([str(t) for t in x_tpath]) + SEPERATION + str(x_coret),
+                                    "y": "r" + SEPERATION + SEPERATION.join([str(t) for t in y_tpath]) + SEPERATION + str(y_coret)
+                                },
+                                "chart_type": "count_bar",
+                                "data": [{
+                                    "x": ndata[ndata.columns[-1]][i],
+                                    "y": [float(y[col][i]) for col in y.columns],
+                                    "text": ""
+                                } for i in range(len(y))],
+                                "legend": list(y.columns),
+                                "xlabel": ndata.columns[-1],
+                                "ylabel": ""
+                            }))
 
             elif cvisd["_chart_type"].endswith("line"):
                 if cvisd["_chart_type"].startswith("ord"):
@@ -1057,11 +1074,16 @@ class searchobj:
                             cs["lincor"] = mean([score.significance_linearcorrelation(y[col].values) for col in y.columns])
                         if self.configuration["slist"]["lin_correlation"]:
                             if len(y.columns) >= 2:
-                                corl = []
-                                for i in range(len(y.columns) - 1):
-                                    for j in range(i + 1, len(y.columns)):
-                                        corl.append(score.significance_correlation(np.array([y[y.columns[i]].values, y[y.columns[j]].values])))
-                                cs["cor"] = mean(corl)
+                                # corl = []
+                                # for i in range(len(y.columns) - 1):
+                                #     for j in range(i + 1, len(y.columns)):
+                                #         corl.append(score.significance_correlation(np.array([y[y.columns[i]].values, y[y.columns[j]].values])))
+                                # cs["cor"] = mean(corl)
+                                try:
+                                    cs["cor"] = score.significance_correlation(y.values)
+                                except:
+                                    print(y.values)
+
 
                         if not catflag:
                             tdata = pd.concat([y, self.dataobj.data[self.dataobj.key if self.dataobj.key else self.dataobj.columnnames[0]]], axis=1)
@@ -1239,17 +1261,20 @@ class searchobj:
         self.visbuffer["scatter"].sort(key=lambda x: x[0], reverse=True)
         self.visbuffer["line"].sort(key=lambda x: x[0], reverse=True)
         self.visbuffer["cat_line"].sort(key=lambda x: x[0], reverse=True)
-        self.visbuffer["bar"].sort(key=lambda x: x[0], reverse=True)
+        self.visbuffer["sum_bar"].sort(key=lambda x: x[0], reverse=True)
+        self.visbuffer["count_bar"].sort(key=lambda x: x[0], reverse=True)
         #   duplication removal
         self.visbuffer["scatter"] = self.duplicationremoval(self.visbuffer["scatter"])
         self.visbuffer["line"] = self.duplicationremoval(self.visbuffer["line"])
         self.visbuffer["cat_line"] = self.duplicationremoval(self.visbuffer["cat_line"])
-        self.visbuffer["bar"] = self.duplicationremoval(self.visbuffer["bar"])
+        self.visbuffer["sum_bar"] = self.duplicationremoval(self.visbuffer["sum_bar"])
+        self.visbuffer["count_bar"] = self.duplicationremoval(self.visbuffer["count_bar"])
         # assemble
         self.vis = self.visbuffer["scatter"][:min(int(len(self.visbuffer["scatter"])*RECOMMENDPCT)+1, MAXSCATTER)] + \
                     self.visbuffer["line"][:min(int(len(self.visbuffer["line"]) * RECOMMENDPCT) + 1, MAXLINE)] + \
                     self.visbuffer["cat_line"][:min(int(len(self.visbuffer["cat_line"]) * RECOMMENDPCT) + 1, MAXCATLINE)] + \
-                    self.visbuffer["bar"][:min(int(len(self.visbuffer["bar"]) * RECOMMENDPCT) + 1, MAXBAR)]
+                    self.visbuffer["sum_bar"][:min(int(len(self.visbuffer["sum_bar"]) * RECOMMENDPCT) + 1, MAXSUMBAR)] + \
+                    self.visbuffer["count_bar"][:min(int(len(self.visbuffer["count_bar"]) * RECOMMENDPCT) + 1, MAXCOUNTBAR)]
 
     def duplicationremoval(self, visbuffer):
         infolist = [{
@@ -1338,7 +1363,7 @@ class searchobj:
                 "id": vid,
                 "node_type": "V",
                 "data": {
-                    "chart_type": vchart_type,
+                    "chart_type": vchart_type if not vchart_type.endswith("bar") else "bar",
                     "data": vdata,
                     "legend": vlegend,
                     "xlabel": vxlabel,
@@ -1347,7 +1372,7 @@ class searchobj:
                 }
             })
             ret["vis_list"].append({
-                "chart_type": vchart_type,
+                "chart_type": vchart_type if not vchart_type.endswith("bar") else "bar",
                 "data": vdata,
                 "legend": vlegend,
                 "xlabel": vxlabel,
@@ -1783,26 +1808,31 @@ class searchobj:
 
 
 if __name__ == "__main__":
-    sheet = spreadsheet("./testdata/5w-allRules-10%Noise.csv", encoding="unicode_escape", keep_default_na=False)
+    sheet = spreadsheet("./testdata/data/cars-w-year.csv", encoding="unicode_escape", keep_default_na=False)
     # sheet = spreadsheet("./testdata/training2.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/ZYF1/req0215/iris.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/NetflixOriginals.csv", encoding="unicode_escape", keep_default_na=False)
     #print(sheet.data)
 
     so = searchobj(dataobj=sheet)
+    so.configuration["tlist"] = ["pca", "lda", "null_num", "null_num1", "null_nom", "null_nom1"]
+    so.configuration["slist"] = score.slist
+    # so.dataobj.colinfo["dim_match"]["clusters"] = [["a"+str(i) for i in range(20, 30)], ["a"+str(i) for i in range(30, 40)]]
+    so.dataobj.colinfo["dim_match"]["clusters"] = [['MPG','Displacement','Horsepower','Weight','Acceleration','Chart Container']]
+    so.dataobj.colinfo["col_names_simi"]["clusters"] = []
     so.presearch()
     so.postsearchinitialization()
     stree = so.postsearch()
     visdata = so.assemblevisdata(round=1)
     # so.showtest()
-    # so.showtest(idx={"xy": [0, 1, 2], "color": [0, 1]})
-    so.dataobj.colinfo["dim_match"]["clusters"] = []
-    so.dataobj.colinfo["col_names_simi"]["clusters"] = []
+    # # so.showtest(idx={"xy": [0, 1, 2], "color": [0, 1]})
+    # so.dataobj.colinfo["dim_match"]["clusters"] = []
+    # so.dataobj.colinfo["col_names_simi"]["clusters"] = []
     so.assembleandevaluevis()
     tree2front = so.assembleTtree()
     print(tree2front)
-    so.singletransformation("r", "select", i_type="==", i=["exp0", "exp1"])
-    so.singletransformation("r", "select", i_type="==", i=["exp3"])
-    so.addvisualization("scatter", {"color": so.tree2front["nodes"][-1]["id"],  "xy": so.tree2front["nodes"][-2]["id"]})
+    # so.singletransformation("r", "select", i_type="==", i=["exp0", "exp1"])
+    # so.singletransformation("r", "select", i_type="==", i=["exp3"])
+    # so.addvisualization("scatter", {"color": so.tree2front["nodes"][-1]["id"],  "xy": so.tree2front["nodes"][-2]["id"]})
 
 

@@ -189,7 +189,7 @@ basicTl = ['rank', 'aggr', 'sum', 'sub', 'mul', 'div']
 dmTl = ["pca", "tsne", "mds", "umap", "dbscan", "kmeans", "lda", "lida"]
 alignTl = ["pca", "tsne", "mds", "umap", "dbscan", "kmeans", "lda"]
 
-threadsharing = [["pca", "tsne", "mds", "umap", "dbscan", "kmeans", "lda", "null_num"], ["lida"], ["null_nom1"], ["null_num1"], ["null_nom"], ["test"]]
+threadsharing = [["pca", "tsne", "mds", "umap", "dbscan", "kmeans", "lda"], ["lida"], ["null_nom1"], ["null_num1"], ["null_nom"], ["null_num"], ["test"]]
 def getRepT(tname, share):
     for ss in share:
         if tname in ss:

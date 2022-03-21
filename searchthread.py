@@ -17,7 +17,7 @@ from config import *
 from utils import *
 
 def tpaththreadfunction(tname, colinfo, q):
-    if RANKINGON:
+    if RANKINGON and tname != "null_num":
         colinfo, rank_tp = ranking(colinfo)
     t = tlist[tname]
     tinput = t["input"]
@@ -178,6 +178,68 @@ def tpaththreadfunction(tname, colinfo, q):
                 pass
             elif t == "aggr":
                 pass
+    elif tname == "null_num":
+        pool.append((0, tpath([{
+            "t": "select",
+            "i_type": "==",
+            "i": [colname for colname in colnames if coltype[colname]["type"] in ["real"]],
+            "o_type": "new_table",
+            "args": (),
+            "kwargs": {},
+            "index": "default"
+        }])))
+        if MULTIPROCESS:
+            updatequeue()
+        for t in basicTl:
+            totalcluster = [colname for colname in colnames if coltype[colname]["type"] in ["real"]]
+            tpp = tpath([{
+                "t": "select",
+                "i_type": "==",
+                "i": totalcluster,
+                "o_type": "new_table",
+                "args": (),
+                "kwargs": {},
+                "index": "default"
+            }])
+            num_dim_clusters = [listintersection(cluster, numcolnames) for cluster in colinfo["dim_match"]["clusters"]]
+            num_sem_clusters = [listintersection(cluster, numcolnames) for cluster in
+                                colinfo["col_names_simi"]["clusters"]]
+            num_clusters = [iii for iii in num_dim_clusters] + [jjj for jjj in num_sem_clusters if
+                                                                jjj not in num_dim_clusters]
+            if t in ['sum', 'sub', 'mul', 'div']:
+                # clusters matching
+                for i, cluster in enumerate(num_clusters):
+                    if ONLYPROCESSCLUSTERMORETHAN2:
+                        if len(cluster) == 2:
+                            continue
+                    if t in ['sub', 'div', 'mul'] and len(cluster) != 2:
+                        continue
+                    if len(cluster) > 1:
+                        new_colname = "%s:(%s)" % (t, ",".join(cluster))
+
+                        if hasRANK(cluster):
+                            continue
+                        tpp.append({
+                            "t": t,
+                            "i_type": "==",
+                            "i": cluster,
+                            "o_type": "append",
+                            "args": (),
+                            "kwargs": {"axis": 1},
+                            "index": pd.Index([new_colname])
+                        })
+                        for c in cluster:
+                            if c not in totalcluster:
+                                totalcluster.append(c)
+            elif t == "rank":
+                pass
+            elif t == "aggr":
+                pass
+            if len(tpp) > 1:
+                tpp[0]["i"] = totalcluster
+                pool.append((0, tpp))
+                if MULTIPROCESS:
+                    updatequeue()
 
     elif tinputtype == "num":
         # e.g., pca, lda, kmeans
@@ -298,6 +360,7 @@ def tpaththreadfunction(tname, colinfo, q):
                                 cur_load = (pre_load[0]+cal_load[t]*(len(cluster)-1), pre_load[1]+dim_load, pre_load[2]+sem_load)
                                 cur_tpath = deepcopy(pre_tpath)
                                 if hasRANK(cluster):
+                                    continue
                                     if len(cur_tpath) == 0 or cur_tpath[0]["t"] != "rank":
                                         cur_tpath = tpath([rank_tp]) + cur_tpath
                                 cur_tpath.append({
