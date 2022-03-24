@@ -1358,7 +1358,7 @@ class searchobj:
             vxlabel = vnode[1]["xlabel"]
             vylabel = vnode[1]["ylabel"]
             vyaxis = vnode[1].get("yaxis", {})
-            vid = vchart_type + "<VIS>" + (SEPERATION + SEPERATION).join(vpnodes.values())
+            vid = vchart_type + "<VIS>" + (SEPERATION + SEPERATION).join(vpnodes.values())  # containing <null_xxx> T
             ret["nodes"].append({
                 "id": vid,
                 "node_type": "V",
@@ -1388,9 +1388,11 @@ class searchobj:
                 ts = vpnode.split(SEPERATION)
                 cid = "r"
                 for i in range(0, len(ts)-1):
-                    pid = SEPERATION.join(ts[:i+1])
-                    cid = pid + SEPERATION + ts[i+1]
                     ct = Tstr2obj(ts[i+1])
+                    if DELETENULLNODE and isinstance(ct.get("name", None), str) and ct["name"].startswith("null"):
+                        continue
+                    pid = cid
+                    cid = pid + SEPERATION + ts[i+1]
                     if cid not in node_ids:
                         node_ids.append(cid)
                         ret["nodes"].append({
