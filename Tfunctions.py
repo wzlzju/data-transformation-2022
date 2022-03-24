@@ -17,7 +17,10 @@ def ppca(data, n_components=2):
 
 def ptsne(data, n_components=2):
     data = (data - data.min()) / (data.max() - data.min())
-    tsne = TSNE(n_components=n_components)
+    if len(data) < 100:
+        tsne = TSNE(n_components=n_components, perplexity=5, method="exact", init="pca")
+    else:
+        tsne = TSNE(n_components=n_components, init="pca")
     res = tsne.fit_transform(data)
     return res
 

@@ -1808,7 +1808,7 @@ class searchobj:
 
 
 if __name__ == "__main__":
-    sheet = spreadsheet("./testdata/data/cars-w-year.csv", encoding="unicode_escape", keep_default_na=False)
+    sheet = spreadsheet("./testdata/newgoogleplaystore.csv", encoding="unicode_escape", keep_default_na=False)
     # sheet = spreadsheet("./testdata/training2.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/ZYF1/req0215/iris.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/NetflixOriginals.csv", encoding="unicode_escape", keep_default_na=False)

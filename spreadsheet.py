@@ -229,8 +229,8 @@ class spreadsheet:
         self.colinfo["col_names_simi"]["cosine"] = pd.DataFrame(utils.distmat(self.colinfo["col_names_simi"]["vectors"],
                                                                               self.colinfo["col_names_simi"]["vectors"],
                                                                               metric="cosine"),
-                                                                index=self.data.columns,
-                                                                columns=self.data.columns)
+                                                                index=self.columnnames,
+                                                                columns=self.columnnames)
 
         # pre-calculate semantic column clustering
         clustering_res = DBSCAN(eps=0.5,
@@ -280,7 +280,7 @@ class spreadsheet:
 
 
 if __name__ == "__main__":
-    d1 = spreadsheet(datapath="./testdata/ie19.csv")
+    d1 = spreadsheet(datapath="./testdata/googlestore.csv")
     #print(d1.colinfo)
     #d2 = spreadsheet(datapath="./testdata/NetflixOriginals.csv", encoding="unicode_escape")
     #print(d2.colinfo)
