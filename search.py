@@ -981,11 +981,12 @@ class searchobj:
                         if self.configuration["slist"]["lin_linearness"]:
                             cs["lincor"] = mean([score.significance_linearcorrelation(y[col].values) for col in y.columns])
                         if self.configuration["slist"]["lin_correlation"]:
+                            pass
                             if len(y.columns) >= 2:
                                 corl = []
                                 for i in range(len(y.columns) - 1):
                                     for j in range(i + 1, len(y.columns)):
-                                        corl.append(score.significance_correlation(np.array([y[y.columns[i]].values, y[y.columns[j]].values])))
+                                        corl.append(score.significance_correlation(np.array([y.iloc[:, i].values, y.iloc[:, j].values])))
                                 cs["cor"] = mean(corl)
                         if cvisd["_chart_type"].startswith("sum"):
                             self.visbuffer["sum_bar"].append((mean(cs.values()), {
@@ -996,7 +997,7 @@ class searchobj:
                                 "chart_type": "sum_bar",
                                 "data": [{
                                     "x": ndata[ndata.columns[-1]][i],
-                                    "y": [float(y[col][i]) for col in y.columns],
+                                    "y": [float(y.iloc[i, j]) for j in range(len(y.columns))],
                                     "text": ""
                                 } for i in range(len(y))],
                                 "legend": list(y.columns),
@@ -1012,7 +1013,7 @@ class searchobj:
                                 "chart_type": "count_bar",
                                 "data": [{
                                     "x": ndata[ndata.columns[-1]][i],
-                                    "y": [float(y[col][i]) for col in y.columns],
+                                    "y": [float(y.iloc[i, j]) for j in range(len(y.columns))],
                                     "text": ""
                                 } for i in range(len(y))],
                                 "legend": list(y.columns),
@@ -1387,6 +1388,7 @@ class searchobj:
                 vpnode = vpnodes[vpnode_channel]
                 ts = vpnode.split(SEPERATION)
                 cid = "r"
+                tsuff = []
                 for i in range(0, len(ts)-1):
                     ct = Tstr2obj(ts[i+1])
                     if DELETENULLNODE and isinstance(ct.get("name", None), str) and ct["name"].startswith("null"):
@@ -1395,12 +1397,15 @@ class searchobj:
                     cid = pid + SEPERATION + ts[i+1]
                     if cid not in node_ids:
                         node_ids.append(cid)
+                        cT = ct["t"] + " " + Tsuffix(self.tpathtree[cid].data) if ct.get("t", None) is not None else ct["name"]
+                        if cT in tsuff:
+                            cT = "group" + str(len(tsuff))
                         ret["nodes"].append({
                             "id": cid,
                             "node_type": "D",
                             "data": {
                                 "headers": self.tpathtree[cid].data,
-                                "T": ct["t"],
+                                "T": cT,
                                 "input": "include all " + ", ".join(ct["i"]) if ct["i_type"] == "like" else ct["i"],
                                 "output mode": ct["o_type"],
                                 "new columns": ct["index"] if isinstance(ct["index"], str) else list(ct["index"]),
@@ -1412,6 +1417,7 @@ class searchobj:
                                 "parameters": ct["para"]
                             }
                         })
+                        tsuff.append(cT)
                         ret["edges"].append({
                             "source": pid,
                             "target": cid
@@ -1810,17 +1816,18 @@ class searchobj:
 
 
 if __name__ == "__main__":
-    sheet = spreadsheet("./testdata/newgoogleplaystore.csv", encoding="unicode_escape", keep_default_na=False)
+    sheet = spreadsheet("./testdata/data training m1.csv", encoding="unicode_escape", keep_default_na=False)
     # sheet = spreadsheet("./testdata/training2.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/ZYF1/req0215/iris.csv", encoding="unicode_escape", keep_default_na=False)
     #sheet = spreadsheet("./testdata/NetflixOriginals.csv", encoding="unicode_escape", keep_default_na=False)
     #print(sheet.data)
 
     so = searchobj(dataobj=sheet)
-    so.configuration["tlist"] = ["pca", "lda", "null_num", "null_num1", "null_nom", "null_nom1"]
+    so.configuration["vlist"] = ["sum_bar"]
+    so.configuration["tlist"] = ["pca", "null_num", "null_num1", "null_nom", "null_nom1"]
     so.configuration["slist"] = score.slist
     # so.dataobj.colinfo["dim_match"]["clusters"] = [["a"+str(i) for i in range(20, 30)], ["a"+str(i) for i in range(30, 40)]]
-    so.dataobj.colinfo["dim_match"]["clusters"] = [['MPG','Displacement','Horsepower','Weight','Acceleration','Chart Container']]
+    so.dataobj.colinfo["dim_match"]["clusters"] = [["weight l2 p"+str(i) for i in range(50)], ["weight l2 p"+str(i) for i in range(50, 100)]]
     so.dataobj.colinfo["col_names_simi"]["clusters"] = []
     so.presearch()
     so.postsearchinitialization()

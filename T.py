@@ -197,3 +197,21 @@ def getRepT(tname, share):
                 if tht in numtl+cattl:
                     return tht
     return None
+
+def Tsuffix(l):
+    if False:
+        return ""
+    if len(l) <= 1:
+        return ""
+    ret = l[0].split(" ")
+    for s in l:
+        t = s.split(" ")
+        tret = []
+        for w in ret:
+            if w in t:
+                tret.append(w)
+        ret = tret
+    if len(l) >= 10 and len(ret) == 0:
+        return "group0"
+    else:
+        return " ".join(ret)

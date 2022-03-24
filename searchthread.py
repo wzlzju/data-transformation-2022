@@ -159,6 +159,8 @@ def tpaththreadfunction(tname, colinfo, q):
                         continue
                     if len(cluster) > 1:
                         new_colname = "%s:(%s)" % (t, ",".join(cluster))
+                        if SUMNAMEREPLACE:
+                            new_colname = "%s: (%s)" % (t, Tsuffix(cluster))
                         tpp = tpath()
                         if hasRANK(cluster):
                             continue
@@ -206,6 +208,7 @@ def tpaththreadfunction(tname, colinfo, q):
                                 colinfo["col_names_simi"]["clusters"]]
             num_clusters = [iii for iii in num_dim_clusters] + [jjj for jjj in num_sem_clusters if
                                                                 jjj not in num_dim_clusters]
+            newcol = []
             if t in ['sum', 'sub', 'mul', 'div']:
                 # clusters matching
                 for i, cluster in enumerate(num_clusters):
@@ -216,6 +219,10 @@ def tpaththreadfunction(tname, colinfo, q):
                         continue
                     if len(cluster) > 1:
                         new_colname = "%s:(%s)" % (t, ",".join(cluster))
+                        if SUMNAMEREPLACE:
+                            new_colname = "%s: (%s)" % (t, Tsuffix(cluster))
+                            new_colname = "group" + str(len(newcol))
+                            newcol.append(new_colname)
 
                         if hasRANK(cluster):
                             continue
@@ -337,6 +344,8 @@ def tpaththreadfunction(tname, colinfo, q):
                                 continue
                             if len(cluster) > 1:
                                 new_colname = "%s:(%s)" % (t, ",".join(cluster))
+                                if SUMNAMEREPLACE:
+                                    new_colname = "%s: (%s)" % (t, Tsuffix(cluster))
                                 cur_colinfo = deepcopy(pre_colinfo)
                                 cur_colinfo['col_names'] = pd.Index(list(cur_colinfo['col_names'])+[new_colname])
                                 cur_colinfo['num_col_names'] = pd.Index(list(cur_colinfo['num_col_names'])+[new_colname])
@@ -458,7 +467,7 @@ def tpaththreadfunction(tname, colinfo, q):
     if not MULTIPROCESS:
         return pool
 
-RANK_prefix = "RANKED "
+RANK_prefix = "rank "
 
 def ranking(colinfo):
     """
