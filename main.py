@@ -15,6 +15,7 @@ from config import *
 import V
 import T
 import score
+import utils
 
 
 app = Flask(__name__)
@@ -102,6 +103,8 @@ def search_begin():
     visdata = sobj.assemblevisdata(round=1)
     sobj.assembleandevaluevis()
     ret = sobj.assembleTtree()
+    if BEAUTIFYCASEFLAG:
+        ret = utils.decorate(ret)
     # sobj.deconstruct()
     return json.dumps(ret)
 

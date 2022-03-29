@@ -1399,7 +1399,7 @@ class searchobj:
                         node_ids.append(cid)
                         cT = ct["t"] + " " + Tsuffix(self.tpathtree[cid].data) if ct.get("t", None) is not None else ct["name"]
                         if cT in tsuff:
-                            cT = "group" + str(len(tsuff))
+                            cT = ct["t"] + " group" + str(len(tsuff))
                         ret["nodes"].append({
                             "id": cid,
                             "node_type": "D",

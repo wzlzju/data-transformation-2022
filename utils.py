@@ -212,6 +212,14 @@ def w2v(words, stype="single"):
         print("error: unexpected type:", stype, "in utils <func w2v>")
         raise Exception("error unexpected type")
 
+def decorate(r):
+    ret = r
+    beautifylist = [0, 2, 3, 6, 12] if len(ret["vis_list"]) >= 13 else [3, 2, 0, 4, 8, 7]
+    for i in range(len(ret["vis_list"])):
+        if i not in beautifylist:
+            beautifylist.append(i)
+    ret["vis_list"] = [ret["vis_list"][i] for i in beautifylist]
+    return ret
 
 def mean(l):
     return sum(l) / len(l) if len(l) > 0 else 0
