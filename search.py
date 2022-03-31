@@ -1438,6 +1438,8 @@ class searchobj:
                     "target": vid
                 })
         self.tree2front = ret
+        if MODIFYCASE1:
+            ret = modify(ret)
         return ret
 
     def singletransformation(self, pid, t, **para):

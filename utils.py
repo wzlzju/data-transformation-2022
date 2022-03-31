@@ -221,6 +221,24 @@ def decorate(r):
     ret["vis_list"] = [ret["vis_list"][i] for i in beautifylist if i < len(ret["vis_list"])]
     return ret
 
+def modify(r):
+    ret = r
+    o2n = {}
+    for i, n in enumerate(ret["nodes"]):
+        o2n[n["id"]] = str(i)
+    for i in range(len(ret["nodes"])):
+        ret["nodes"][i]["id"] = o2n[ret["nodes"][i]["id"]]
+    for i in range(len(ret["edges"])):
+        ret["edges"][i]["source"] = o2n[ret["edges"][i]["source"]]
+        ret["edges"][i]["target"] = o2n[ret["edges"][i]["target"]]
+    for i in range(len(ret["vis_list"])):
+        for j in range(len(ret["vis_list"][i]["paths"]["nodes"])):
+            ret["vis_list"][i]["paths"]["nodes"][j] = o2n[ret["vis_list"][i]["paths"]["nodes"][j]]
+        for j in range(len(ret["vis_list"][i]["paths"]["edges"])):
+            ret["vis_list"][i]["paths"]["edges"][j]["source"] = o2n[ret["vis_list"][i]["paths"]["edges"][j]["source"]]
+            ret["vis_list"][i]["paths"]["edges"][j]["target"] = o2n[ret["vis_list"][i]["paths"]["edges"][j]["target"]]
+    return ret
+
 def mean(l):
     return sum(l) / len(l) if len(l) > 0 else 0
 
