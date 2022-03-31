@@ -218,7 +218,7 @@ def decorate(r):
     for i in range(len(ret["vis_list"])):
         if i not in beautifylist:
             beautifylist.append(i)
-    ret["vis_list"] = [ret["vis_list"][i] for i in beautifylist]
+    ret["vis_list"] = [ret["vis_list"][i] for i in beautifylist if i < len(ret["vis_list"])]
     return ret
 
 def mean(l):

@@ -92,6 +92,9 @@ class spreadsheet:
                         else:
                             if self.key:
                                 self.colinfo["col_type"][self.key]["iskey"] = False
+                                if self.colinfo["col_type"][self.key]["type"] == "nominal":
+                                    self.colinfo["col_type"][self.key]["type"] = "int"
+                                    self.colinfo["num_col_names"] = self.colinfo["num_col_names"].append(pd.Index([self.key]))
                             self.colinfo["col_type"][col]["iskey"] = True
                             self.key = col
                     elif len(self.colinfo["col_type"][col]["domain"]) <= self.rowsnum * NOMINALSTD:
@@ -115,7 +118,7 @@ class spreadsheet:
                     elif cd < self.colinfo["col_type"][col]["min"]:
                         self.colinfo["col_type"][col]["min"] = cd
                 if len(self.colinfo["col_type"][col]["domain"]) == self.rowsnum:
-                    if self.key and self.colinfo["col_type"][self.key]["type"] in ["str", "int"]:
+                    if self.key and self.colinfo["col_type"][self.key]["type"] in ["str", "int", "nominal"]:
                         pass
                     else:
                         if self.key:
